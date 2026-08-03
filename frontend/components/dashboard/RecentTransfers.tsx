@@ -13,6 +13,8 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 
+import { PageSection } from "@/components/page";
+
 const recentTransfers = [
     {
         name: "Project_Backup.zip",
@@ -37,60 +39,56 @@ const recentTransfers = [
 export function RecentTransfers() {
     return (
         <section className="space-y-4">
-            <div>
-                <h2 className="text-xl font-semibold">
-                    Recent Transfers
-                </h2>
+            <PageSection
+                title="Quick Actions"
+                description="Frequently used operations."
+            >
 
-                <p className="text-sm text-muted-foreground">
-                    Latest file transfer activity.
-                </p>
-            </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <ArrowUpRight className="size-5" />
+                            Activity
+                        </CardTitle>
+                    </CardHeader>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <ArrowUpRight className="size-5" />
-                        Activity
-                    </CardTitle>
-                </CardHeader>
+                    <CardContent className="space-y-3">
+                        {recentTransfers.map((transfer) => {
+                            const Icon = transfer.icon;
 
-                <CardContent className="space-y-3">
-                    {recentTransfers.map((transfer) => {
-                        const Icon = transfer.icon;
-
-                        return (
-                            <div
-                                key={transfer.name}
-                                className="flex items-center justify-between rounded-lg border p-3"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <Icon
-                                        className={`size-5 ${transfer.status === "Completed"
+                            return (
+                                <div
+                                    key={transfer.name}
+                                    className="flex items-center justify-between rounded-lg border p-3"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <Icon
+                                            className={`size-5 ${transfer.status === "Completed"
                                                 ? "text-green-600 dark:text-green-400"
                                                 : "text-yellow-600 dark:text-yellow-400"
-                                            }`}
-                                    />
+                                                }`}
+                                        />
 
-                                    <div>
-                                        <p className="font-medium">
-                                            {transfer.name}
-                                        </p>
+                                        <div>
+                                            <p className="font-medium">
+                                                {transfer.name}
+                                            </p>
 
-                                        <p className="text-sm text-muted-foreground">
-                                            {transfer.destination}
-                                        </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {transfer.destination}
+                                            </p>
+                                        </div>
                                     </div>
-                                </div>
 
-                                <span className="text-sm text-muted-foreground">
-                                    {transfer.status}
-                                </span>
-                            </div>
-                        );
-                    })}
-                </CardContent>
-            </Card>
+                                    <span className="text-sm text-muted-foreground">
+                                        {transfer.status}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </CardContent>
+                </Card>
+            </PageSection>
         </section>
     );
 }

@@ -1,23 +1,18 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/page";
 
 export function DashboardHeader() {
     return (
-        <div className="flex items-center justify-between">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">
-                    Dashboard
-                </h1>
-
-                <p className="text-muted-foreground">
-                    Monitor your devices and manage file transfers.
-                </p>
-            </div>
-
-            <Button variant="outline">
-                Refresh
-            </Button>
-        </div>
+        <PageHeader
+            title="Dashboard"
+            description="Monitor your devices and manage file transfers."
+            actions={
+                <Button variant="outline">
+                    Refresh
+                </Button>
+            }
+        />
     );
 }

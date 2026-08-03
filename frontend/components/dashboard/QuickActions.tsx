@@ -13,6 +13,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
+import { PageSection } from "@/components/page";
 
 const actions = [
     {
@@ -38,48 +39,44 @@ const actions = [
 export function QuickActions() {
     return (
         <section className="space-y-4">
-            <div>
-                <h2 className="text-xl font-semibold">
-                    Quick Actions
-                </h2>
+            <PageSection
+                title="Quick Actions"
+                description="Frequently used operations."
+            >
 
-                <p className="text-sm text-muted-foreground">
-                    Frequently used operations.
-                </p>
-            </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                    {actions.map((action) => {
+                        const Icon = action.icon;
 
-            <div className="grid gap-4 md:grid-cols-3">
-                {actions.map((action) => {
-                    const Icon = action.icon;
+                        return (
+                            <Card key={action.title}>
+                                <CardHeader className="flex flex-row items-center gap-3 space-y-0">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                                        <Icon className="size-5" />
+                                    </div>
 
-                    return (
-                        <Card key={action.title}>
-                            <CardHeader className="flex flex-row items-center gap-3 space-y-0">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                                    <Icon className="size-5" />
-                                </div>
+                                    <CardTitle className="text-base">
+                                        {action.title}
+                                    </CardTitle>
+                                </CardHeader>
 
-                                <CardTitle className="text-base">
-                                    {action.title}
-                                </CardTitle>
-                            </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <p className="text-sm text-muted-foreground">
+                                        {action.description}
+                                    </p>
 
-                            <CardContent className="space-y-4">
-                                <p className="text-sm text-muted-foreground">
-                                    {action.description}
-                                </p>
-
-                                <Button
-                                    variant={action.variant}
-                                    className="w-full"
-                                >
-                                    Open
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    );
-                })}
-            </div>
+                                    <Button
+                                        variant={action.variant}
+                                        className="w-full"
+                                    >
+                                        Open
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
+                </div>
+            </PageSection>
         </section>
     );
 }

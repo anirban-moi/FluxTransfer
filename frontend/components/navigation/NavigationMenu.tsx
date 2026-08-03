@@ -6,7 +6,7 @@ import { NavigationItem } from "./NavigationItem";
 
 export function NavigationMenu() {
     return (
-        <nav className="flex flex-col gap-2">
+        <nav className="space-y-1">
             {navigationItems.map((item) => (
                 <NavigationItem
                     key={item.href}
