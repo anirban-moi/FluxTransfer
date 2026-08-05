@@ -5,6 +5,7 @@ import {
     Info,
     Laptop,
     Settings,
+    History,
     type LucideIcon,
 } from "lucide-react";
 
@@ -34,6 +35,11 @@ export const navigationItems: NavigationItem[] = [
         title: "Devices",
         href: "/devices",
         icon: Laptop,
+    },
+    {
+        title: "Transfer History",
+        href: "/history",
+        icon: History,
     },
     {
         title: "Settings",
