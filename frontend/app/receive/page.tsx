@@ -1,10 +1,13 @@
-export default function ReceivePage() {
+"use client";
+
+import { ReceiveTransferProvider } from "@/features/receive/context";
+import ReceiveWorkflow from "./ReceiveWorkflow";
+
+export default function ReceiveFilesPage() {
+
     return (
-        <div>
-            <h1 className="text-3xl font-bold">Receive Files</h1>
-            <p className="mt-2 text-muted-foreground">
-                Receive incoming file transfers.
-            </p>
-        </div>
+        <ReceiveTransferProvider>
+            <ReceiveWorkflow />
+        </ReceiveTransferProvider>
     );
 }
