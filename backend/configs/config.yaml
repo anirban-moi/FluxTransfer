@@ -1,0 +1,18 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+
+logging:
+  level: "info"
+
+device:
+  name: "FluxTransfer"
+
+discovery:
+  enabled: true
+  port: 53317
+  interval: 5
+
+transfer:
+  chunkSize: 1048576
+  timeout: 30
