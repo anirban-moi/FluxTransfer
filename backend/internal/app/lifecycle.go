@@ -20,17 +20,31 @@ func (a *Application) Run() error {
 		),
 	)
 
-	go func() {
+	// Application context shared by all long-running services.
+	appCtx, appCancel := context.WithCancel(context.Background())
+	defer appCancel()
 
+	// Start HTTP Server
+	go func() {
 		if err := a.server.Start(); err != nil {
-			a.logger.Fatal(
-				"Failed to start HTTP server",
+			a.logger.Error(
+				"HTTP server stopped",
 				zap.Error(err),
 			)
 		}
-
 	}()
 
+	// Start Discovery Service
+	go func() {
+		if err := a.discovery.Start(appCtx); err != nil {
+			a.logger.Error(
+				"Discovery service stopped",
+				zap.Error(err),
+			)
+		}
+	}()
+
+	// Wait for shutdown signal.
 	quit := make(chan os.Signal, 1)
 
 	signal.Notify(
@@ -45,17 +59,21 @@ func (a *Application) Run() error {
 		"Shutdown signal received",
 	)
 
-	ctx, cancel := context.WithTimeout(
+	// Notify all background services to stop.
+	appCancel()
+
+	// Allow services a moment to exit cleanly.
+	shutdownCtx, cancel := context.WithTimeout(
 		context.Background(),
 		5*time.Second,
 	)
-
 	defer cancel()
 
-	if err := a.server.Shutdown(ctx); err != nil {
+	// Shutdown HTTP Server
+	if err := a.server.Shutdown(shutdownCtx); err != nil {
 
 		a.logger.Error(
-			"Failed to shutdown server",
+			"Failed to shutdown HTTP server",
 			zap.Error(err),
 		)
 

@@ -6,13 +6,17 @@ logging:
   level: "info"
 
 device:
+  id: "" 
   name: "FluxTransfer"
 
 discovery:
   enabled: true
+  host: "0.0.0.0"
   port: 53317
   interval: 5
 
 transfer:
+  host: "0.0.0.0"
+  port: 53318
   chunkSize: 1048576
   timeout: 30

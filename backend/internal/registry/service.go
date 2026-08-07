@@ -17,10 +17,7 @@ func (r *DeviceRegistry) Add(device *models.Device) bool {
 	return true
 }
 
-func (r *DeviceRegistry) Update(
-	device *models.Device,
-) bool {
-
+func (r *DeviceRegistry) Update(device *models.Device) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

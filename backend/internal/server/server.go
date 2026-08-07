@@ -8,23 +8,31 @@ import (
 
 	"github.com/anirban-moi/FluxTransfer/backend/internal/config"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/logger"
+	"github.com/anirban-moi/FluxTransfer/backend/internal/models"
+	"github.com/anirban-moi/FluxTransfer/backend/internal/registry"
 )
 
 type Server struct {
-	cfg    *config.Config
-	logger *logger.Logger
-
+	cfg        *config.Config
+	logger     *logger.Logger
+	registry   registry.Registry
+	device     *models.Device
 	httpServer *http.Server
 }
 
 func New(
 	cfg *config.Config,
 	log *logger.Logger,
+	reg registry.Registry,
+	device *models.Device,
 ) *Server {
 
 	return &Server{
-		cfg:    cfg,
-		logger: log,
+		cfg:        cfg,
+		logger:     log,
+		registry:   reg,
+		device:     device,
+		httpServer: nil,
 	}
 }
 
