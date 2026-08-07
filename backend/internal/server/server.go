@@ -48,7 +48,7 @@ func (s *Server) Start() error {
 			s.cfg.Server.Host,
 			s.cfg.Server.Port,
 		),
-		Handler:      mux,
+		Handler:      s.cors(mux),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}

@@ -3,12 +3,14 @@
 import {
     createContext,
     useContext,
+    useEffect,
     useMemo,
     useState,
     type ReactNode,
 } from "react";
 
-import { mockDevices } from "../constants/devices";
+// import { mockDevices } from "../constants/devices";
+import { getDevices } from "@/lib/api";
 import type { Device } from "../types/device";
 
 type DevicesState = {
@@ -29,9 +31,10 @@ type DevicesContextType = {
     discoverDevices: () => void;
 };
 
+// Mock initial state for development purposes. In a real application, you would fetch this data from an API or other data source.
 const initialState: DevicesState = {
-    devices: mockDevices,
-    selectedDevice: mockDevices[0],
+    devices: [],
+    selectedDevice: undefined,
     search: "",
     showOnlineOnly: false,
     isDiscovering: false,
@@ -44,8 +47,10 @@ export function DevicesProvider({
 }: {
     children: ReactNode;
 }) {
-    const [state, setState] =
-        useState(initialState);
+    const [state, setState] = useState<DevicesState>(initialState);
+    useEffect(() => {
+        fetchDevices();
+    }, []);
 
     function selectDevice(device: Device) {
         setState((prev) => ({
@@ -69,38 +74,40 @@ export function DevicesProvider({
         }));
     }
 
+    async function fetchDevices() {
+        try {
+            const devices = await getDevices();
+            setState((prev) => ({
+                ...prev,
+                devices,
+                selectedDevice:
+                    devices.length > 0
+                        ? devices[0]
+                        : undefined,
+            }));
+        } catch (error) {
+            console.error(
+                "Failed to load devices",
+                error,
+            );
+        }
+    }
+
     async function refreshDevices() {
         setState((prev) => ({
             ...prev,
             isDiscovering: true,
         }));
 
-        await new Promise((resolve) =>
-            setTimeout(resolve, 2000)
-        );
-
-        setState((prev) => {
-            const updatedDevices = prev.devices.map((device) => {
-                if (device.id === "device-3") {
-                    return {
-                        ...device,
-                        status:
-                            device.status === "offline"
-                                ? "online"
-                                : "offline",
-                        lastSeen: new Date(),
-                    };
-                }
-
-                return device;
-            });
-
-            return {
+        try {
+            await fetchDevices();
+        } finally {
+            setState((prev) => ({
                 ...prev,
-                devices: updatedDevices,
                 isDiscovering: false,
-            };
-        });
+            }));
+        }
+
     }
 
     function discoverDevices() {
