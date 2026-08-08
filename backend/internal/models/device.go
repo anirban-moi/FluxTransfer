@@ -11,13 +11,13 @@ const (
 )
 
 type Device struct {
-	ID        string
-	Name      string
-	Hostname  string
-	Platform  string
-	IPAddress string
-	Port      int
-	Status    DeviceStatus
-	LastSeen  time.Time
-	Version   string
+	ID        string       `json:"id"`
+	Name      string       `json:"name"`
+	Hostname  string       `json:"hostname"`
+	Platform  string       `json:"platform"`
+	IPAddress string       `json:"ipAddress"`
+	Port      int          `json:"port"`
+	Status    DeviceStatus `json:"status"`
+	LastSeen  time.Time    `json:"lastSeen"`
+	Version   string       `json:"version"`
 }

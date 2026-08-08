@@ -6,8 +6,8 @@ logging:
   level: "info"
 
 device:
-  id: "" 
-  name: "FluxTransfer"
+  id: "device-2" 
+  name: "Anirban MSI Laptop"
 
 discovery:
   enabled: true
