@@ -24,21 +24,43 @@ func (a *Application) Run() error {
 	appCtx, appCancel := context.WithCancel(context.Background())
 	defer appCancel()
 
+	go func() {
+
+		if err := a.udpListener.Listen(appCtx); err != nil {
+
+			a.logger.Error(
+				"UDP listener stopped",
+				zap.Error(err),
+			)
+
+		}
+
+	}()
+
+	// Start Discovery Service
+	if err := a.discovery.Start(appCtx); err != nil {
+
+		a.logger.Fatal(
+			"Failed to start discovery service",
+			zap.Error(err),
+		)
+
+	}
+
+	if err := a.heartbeat.Start(appCtx); err != nil {
+
+		a.logger.Fatal(
+			"Failed to start heartbeat service",
+			zap.Error(err),
+		)
+
+	}
+
 	// Start HTTP Server
 	go func() {
 		if err := a.server.Start(); err != nil {
 			a.logger.Error(
 				"HTTP server stopped",
-				zap.Error(err),
-			)
-		}
-	}()
-
-	// Start Discovery Service
-	go func() {
-		if err := a.discovery.Start(appCtx); err != nil {
-			a.logger.Error(
-				"Discovery service stopped",
 				zap.Error(err),
 			)
 		}
@@ -78,6 +100,20 @@ func (a *Application) Run() error {
 		)
 
 		return err
+	}
+
+	if err := a.heartbeat.Shutdown(shutdownCtx); err != nil {
+		a.logger.Error(
+			"Failed to shutdown heartbeat service",
+			zap.Error(err),
+		)
+	}
+
+	if err := a.discovery.Shutdown(shutdownCtx); err != nil {
+		a.logger.Error(
+			"Failed to shutdown discovery service",
+			zap.Error(err),
+		)
 	}
 
 	a.logger.Info("Backend stopped")

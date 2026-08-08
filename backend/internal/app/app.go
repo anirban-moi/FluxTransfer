@@ -4,22 +4,31 @@ import (
 	"time"
 
 	"github.com/anirban-moi/FluxTransfer/backend/internal/config"
+	deviceServicePkg "github.com/anirban-moi/FluxTransfer/backend/internal/device"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/discovery"
+	"github.com/anirban-moi/FluxTransfer/backend/internal/heartbeat"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/logger"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/models"
+	"github.com/anirban-moi/FluxTransfer/backend/internal/network/udp"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/registry"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/server"
 )
 
 type Application struct {
-	cfg       *config.Config
-	logger    *logger.Logger
-	server    *server.Server
-	registry  registry.Registry
-	discovery *discovery.Service
+	cfg            *config.Config
+	logger         *logger.Logger
+	server         *server.Server
+	registry       registry.Registry
+	discovery      *discovery.Service
+	heartbeat      *heartbeat.Service
+	udpListener    *udp.Listener
+	udpDispatcher  *udp.Dispatcher
+	udpBroadcaster *udp.Broadcaster
 }
 
-func New(cfg *config.Config) (*Application, error) {
+func New(
+	cfg *config.Config,
+) (*Application, error) {
 
 	// Logger
 	logCfg := logger.Config{
@@ -33,6 +42,11 @@ func New(cfg *config.Config) (*Application, error) {
 
 	// Device Registry
 	deviceRegistry := registry.New()
+
+	// Device Service
+	deviceService := deviceServicePkg.New(
+		deviceRegistry,
+	)
 
 	// Local Device
 	device := &models.Device{
@@ -59,19 +73,79 @@ func New(cfg *config.Config) (*Application, error) {
 		BroadcastPort:     53317,
 	}
 
-	// Discovery Service
+	// Heartbeat Configuration
+	heartbeatCfg := heartbeat.Config{
+		Interval:     5 * time.Second,
+		OfflineAfter: 15 * time.Second,
+	}
+
+	// ------------------------------------------------------------------
+	// Shared UDP Infrastructure
+	// ------------------------------------------------------------------
+
+	udpListenerConn, err := udp.Listen(
+		discoveryCfg.BroadcastPort,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	udpBroadcastConn, err := udp.Dial(
+		discoveryCfg.BroadcastPort,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	udpBroadcaster := udp.NewBroadcaster(
+		appLogger,
+		udpBroadcastConn,
+	)
+
+	dispatcher := udp.NewDispatcher()
+
+	udpListener := udp.NewListener(
+		udpListenerConn,
+		dispatcher,
+	)
+
+	// ------------------------------------------------------------------
+	// Services
+	// ------------------------------------------------------------------
+
 	discoveryService := discovery.New(
 		discoveryCfg,
 		appLogger,
 		device,
-		deviceRegistry,
+		deviceService,
+		udpBroadcaster,
+	)
+
+	heartbeatService := heartbeat.New(
+		heartbeatCfg,
+		appLogger,
+		device,
+		deviceService,
+	)
+
+	// Register protocol handlers
+	dispatcher.Register(
+		discovery.NewHandler(discoveryService),
+	)
+
+	dispatcher.Register(
+		heartbeat.NewHandler(heartbeatService),
 	)
 
 	return &Application{
-		cfg:       cfg,
-		logger:    appLogger,
-		server:    httpServer,
-		registry:  deviceRegistry,
-		discovery: discoveryService,
+		cfg:            cfg,
+		logger:         appLogger,
+		server:         httpServer,
+		registry:       deviceRegistry,
+		discovery:      discoveryService,
+		heartbeat:      heartbeatService,
+		udpListener:    udpListener,
+		udpDispatcher:  dispatcher,
+		udpBroadcaster: udpBroadcaster,
 	}, nil
 }

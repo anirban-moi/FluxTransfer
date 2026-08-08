@@ -5,9 +5,13 @@ import (
 	"net"
 	"time"
 
+	"github.com/anirban-moi/FluxTransfer/backend/internal/device"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/logger"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/models"
-	"github.com/anirban-moi/FluxTransfer/backend/internal/registry"
+	"github.com/anirban-moi/FluxTransfer/backend/internal/network/udp"
+
+	discoveryprotocol "github.com/anirban-moi/FluxTransfer/backend/internal/protocol/discovery"
+	packetprotocol "github.com/anirban-moi/FluxTransfer/backend/internal/protocol/packet"
 
 	"go.uber.org/zap"
 )
@@ -19,40 +23,30 @@ type Service struct {
 
 	device *models.Device
 
-	registry registry.Registry
+	deviceService device.Service
 
-	broadcaster *Broadcaster
-
-	listener *Listener
+	udp *udp.Broadcaster
 }
 
 func New(
 	cfg Config,
 	log *logger.Logger,
 	device *models.Device,
-	reg registry.Registry,
+	deviceService device.Service,
+	udpBroadcaster *udp.Broadcaster,
 ) *Service {
 
-	service := &Service{
-		logger:   log,
-		config:   cfg,
-		device:   device,
-		registry: reg,
+	return &Service{
+		logger: log,
+
+		config: cfg,
+
+		device: device,
+
+		deviceService: deviceService,
+
+		udp: udpBroadcaster,
 	}
-
-	service.broadcaster = NewBroadcaster(
-		cfg,
-		log,
-		service,
-	)
-
-	service.listener = NewListener(
-		cfg,
-		log,
-		service,
-	)
-
-	return service
 }
 
 func (s *Service) DiscoveryPacket() *models.DiscoveryPacket {
@@ -69,12 +63,41 @@ func (s *Service) DiscoveryPacket() *models.DiscoveryPacket {
 	}
 }
 
+func (s *Service) broadcast() error {
+
+	discoveryPacket := s.DiscoveryPacket()
+
+	payload, err := discoveryprotocol.Encode(
+		discoveryPacket,
+	)
+	if err != nil {
+		return err
+	}
+
+	envelope := &packetprotocol.Envelope{
+		Type:    packetprotocol.TypeDiscovery,
+		Payload: payload,
+	}
+
+	data, err := packetprotocol.Encode(
+		envelope,
+	)
+	if err != nil {
+		return err
+	}
+
+	s.logger.Debug(
+		"Broadcasting discovery packet",
+	)
+
+	return s.udp.Send(data)
+}
+
 func (s *Service) HandlePacket(
 	packet *models.DiscoveryPacket,
 	addr *net.UDPAddr,
 ) {
 
-	// Ignore packets sent by ourselves.
 	if packet.DeviceID == s.device.ID {
 		return
 	}
@@ -91,14 +114,26 @@ func (s *Service) HandlePacket(
 		LastSeen:  time.Now(),
 	}
 
-	if !s.registry.Add(device) {
-		s.registry.Update(device)
+	_, exists := s.deviceService.Get(
+		device.ID,
+	)
+
+	if exists {
+		s.deviceService.Refresh(device)
+	} else {
+		s.deviceService.Register(device)
 	}
 
 	s.logger.Info(
 		"Discovery packet received",
-		zap.String("device", packet.Name),
-		zap.String("address", addr.IP.String()),
+		zap.String(
+			"device",
+			packet.Name,
+		),
+		zap.String(
+			"address",
+			addr.IP.String(),
+		),
 	)
 }
 
@@ -107,20 +142,26 @@ func (s *Service) Start(
 ) error {
 
 	go func() {
-		if err := s.listener.Start(ctx); err != nil {
-			s.logger.Error(
-				"Discovery listener stopped",
-				zap.Error(err),
-			)
-		}
-	}()
 
-	go func() {
-		if err := s.broadcaster.Start(ctx); err != nil {
-			s.logger.Error(
-				"Discovery broadcaster stopped",
-				zap.Error(err),
-			)
+		ticker := time.NewTicker(
+			s.config.BroadcastInterval,
+		)
+		defer ticker.Stop()
+
+		for {
+
+			select {
+			case <-ctx.Done():
+				return
+
+			case <-ticker.C:
+				if err := s.broadcast(); err != nil {
+					s.logger.Error(
+						"Discovery broadcast failed",
+						zap.Error(err),
+					)
+				}
+			}
 		}
 	}()
 
