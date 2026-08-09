@@ -42,6 +42,16 @@ func (s *Server) registerRoutes(
 	)
 
 	mux.HandleFunc(
+		"POST /api/pairings/accept",
+		pairingsHandler.Accept,
+	)
+
+	mux.HandleFunc(
+		"POST /api/pairings/reject",
+		pairingsHandler.Reject,
+	)
+
+	mux.HandleFunc(
 		"GET /api/pairings/pending",
 		pairingsHandler.Pending,
 	)

@@ -65,6 +65,11 @@ func (s *Service) DiscoveryPacket() *models.DiscoveryPacket {
 
 func (s *Service) broadcast() error {
 
+	s.logger.Info(
+		"Sending discovery broadcast",
+		zap.String("device", s.device.Name),
+	)
+
 	discoveryPacket := s.DiscoveryPacket()
 
 	payload, err := discoveryprotocol.Encode(

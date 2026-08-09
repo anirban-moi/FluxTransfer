@@ -81,6 +81,10 @@ func (s *Service) HandlePairRequest(
 	addr *net.UDPAddr,
 ) {
 
+	if packet.DeviceID == s.device.ID {
+		return
+	}
+
 	s.pending.Add(
 		&PendingRequest{
 			DeviceID:  packet.DeviceID,
