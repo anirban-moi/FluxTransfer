@@ -10,7 +10,7 @@ import {
 } from "react";
 
 // import { mockDevices } from "../constants/devices";
-import { getDevices } from "@/lib/api";
+import { getDevices, pairDevice as pairDeviceApi, } from "@/lib/api";
 import type { Device } from "../types/device";
 
 type DevicesState = {
@@ -29,6 +29,7 @@ type DevicesContextType = {
     toggleOnlineOnly: () => void;
     refreshDevices: () => Promise<void>;
     discoverDevices: () => void;
+    pairDevice: (device: Device) => Promise<void>;
 };
 
 // Mock initial state for development purposes. In a real application, you would fetch this data from an API or other data source.
@@ -116,6 +117,32 @@ export function DevicesProvider({
         console.log("Discovering devices...");
     }
 
+    async function pairDevice(
+        device: Device,
+    ) {
+
+        try {
+
+            await pairDeviceApi(
+                device.id,
+            );
+
+            console.log(
+                "Pair request sent:",
+                device.name,
+            );
+
+        } catch (error) {
+
+            console.error(
+                "Failed to pair device",
+                error,
+            );
+
+        }
+
+    }
+
     const visibleDevices = useMemo(() => {
         return state.devices.filter((device) => {
             const matchesSearch =
@@ -150,6 +177,7 @@ export function DevicesProvider({
             toggleOnlineOnly,
             refreshDevices,
             discoverDevices,
+            pairDevice,
         }),
         [state]
     );

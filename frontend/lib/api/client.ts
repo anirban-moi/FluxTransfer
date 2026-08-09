@@ -40,6 +40,10 @@ async function request<T>(
         );
     }
 
+    if (response.status === 204 || response.status === 202) {
+        return undefined as T;
+    }
+
     return response.json() as Promise<T>;
 }
 

@@ -15,11 +15,14 @@ import {
 } from "@/components/ui/card";
 
 import type { Device } from "@/features/devices/types/device";
+import { Button } from "../ui/button";
 
 type DeviceCardProps = {
     device: Device;
 
     onClick?: (device: Device) => void;
+
+    onPair?: (device: Device) => void;
 };
 
 function getPlatformIcon(platform: Device["platform"]) {
@@ -62,6 +65,7 @@ function getTransferIcon(state: Device["transferState"]) {
 export function DeviceCard({
     device,
     onClick,
+    onPair,
 }: DeviceCardProps) {
     return (
         <Card
@@ -100,7 +104,18 @@ export function DeviceCard({
                         <span className="text-xs capitalize text-muted-foreground">
                             {device.status}
                         </span>
+
                     </div>
+                    <Button
+                        size="sm"
+                        disabled={device.status !== "online"}
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            onPair?.(device);
+                        }}
+                    >
+                        Pair
+                    </Button>
                 </div>
 
                 {/* Activity */}

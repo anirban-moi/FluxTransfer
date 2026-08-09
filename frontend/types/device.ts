@@ -13,4 +13,5 @@ export interface Device {
     version: string;
     status: DeviceStatus;
     lastSeen: string;
+    paired: boolean;
 }

@@ -10,12 +10,15 @@ type DeviceListProps = {
     selectedDeviceId?: string;
 
     onSelect?: (device: Device) => void;
+
+    onPair?: (device: Device) => void;
 };
 
 export function DeviceList({
     devices,
     selectedDeviceId,
     onSelect,
+    onPair
 }: DeviceListProps) {
     if (devices.length === 0) {
         return (
@@ -39,6 +42,7 @@ export function DeviceList({
                     <DeviceCard
                         device={device}
                         onClick={onSelect}
+                        onPair={onPair}
                     />
                 </div>
             ))}

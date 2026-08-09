@@ -22,6 +22,7 @@ function DevicesWorkflow() {
         updateSearch,
         toggleOnlineOnly,
         refreshDevices,
+        pairDevice,
     } = useDevices();
 
     return (
@@ -56,6 +57,7 @@ function DevicesWorkflow() {
                                 state.selectedDevice?.id
                             }
                             onSelect={selectDevice}
+                            onPair={pairDevice}
                         />
                     )}
                 </div>
