@@ -27,6 +27,7 @@ func New(
 	log *logger.Logger,
 	reg registry.Registry,
 	device *models.Device,
+	pairingService *pairing.Service,
 ) *Server {
 
 	return &Server{
@@ -34,6 +35,7 @@ func New(
 		logger:     log,
 		registry:   reg,
 		device:     device,
+		pairing:    pairingService,
 		httpServer: nil,
 	}
 }

@@ -34,7 +34,6 @@ func (h *Handler) Handle(
 	}
 
 	if envelope.Type != packetprotocol.TypeDiscovery {
-		fmt.Println("Not a discovery packet")
 		return
 	}
 

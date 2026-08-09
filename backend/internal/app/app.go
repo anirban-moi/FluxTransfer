@@ -86,14 +86,6 @@ func New(
 		Status:   models.StatusOnline,
 	}
 
-	// HTTP Server
-	httpServer := server.New(
-		cfg,
-		appLogger,
-		deviceRegistry,
-		device,
-	)
-
 	// Discovery Configuration
 	discoveryCfg := discovery.Config{
 		BroadcastInterval: 5 * time.Second,
@@ -165,11 +157,24 @@ func New(
 	)
 
 	// pairing services
+
+	pendingRegistry := pairing.NewPendingRegistry()
+
 	pairingService := pairing.New(
 		appLogger,
 		device,
 		deviceService,
 		udpBroadcaster,
+		pendingRegistry,
+	)
+
+	// HTTP Server
+	httpServer := server.New(
+		cfg,
+		appLogger,
+		deviceRegistry,
+		device,
+		pairingService,
 	)
 
 	dispatcher.Register(

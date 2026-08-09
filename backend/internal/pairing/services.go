@@ -3,6 +3,7 @@ package pairing
 import (
 	"context"
 	"net"
+	"time"
 
 	"github.com/anirban-moi/FluxTransfer/backend/internal/device"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/logger"
@@ -17,6 +18,7 @@ type Service struct {
 	device        *models.Device
 	deviceService device.Service
 	udp           *udp.Broadcaster
+	pending       *PendingRegistry
 }
 
 func New(
@@ -24,6 +26,7 @@ func New(
 	device *models.Device,
 	deviceService device.Service,
 	broadcaster *udp.Broadcaster,
+	pending *PendingRegistry,
 ) *Service {
 
 	return &Service{
@@ -31,6 +34,7 @@ func New(
 		device:        device,
 		deviceService: deviceService,
 		udp:           broadcaster,
+		pending:       pending,
 	}
 }
 
@@ -73,10 +77,25 @@ func (s *Service) HandlePairRequest(
 	addr *net.UDPAddr,
 ) {
 
+	s.pending.Add(
+		&PendingRequest{
+			DeviceID:  packet.DeviceID,
+			Name:      packet.Name,
+			Hostname:  packet.Hostname,
+			Platform:  packet.Platform,
+			Address:   addr.IP.String(),
+			CreatedAt: time.Now(),
+		},
+	)
+
 	s.logger.Info(
 		"Pair request received",
 	)
 
+}
+
+func (s *Service) PendingRequests() []*PendingRequest {
+	return s.pending.List()
 }
 
 func (s *Service) Pair(
