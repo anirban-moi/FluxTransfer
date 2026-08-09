@@ -9,6 +9,8 @@ import {
     EmptyDevices,
 } from "@/components/devices";
 
+import { IncomingPairDialog } from "@/components/pairing";
+
 import {
     DevicesProvider,
     useDevices,
@@ -23,6 +25,8 @@ function DevicesWorkflow() {
         toggleOnlineOnly,
         refreshDevices,
         pairDevice,
+        acceptRequest,
+        rejectRequest,
     } = useDevices();
 
     return (
@@ -62,6 +66,23 @@ function DevicesWorkflow() {
                     )}
                 </div>
             </PageSection>
+
+            {/* Incoming Pair Request */}
+            {state.pendingPairRequests.length > 0 && (
+                <IncomingPairDialog
+                    request={state.pendingPairRequests[0]}
+                    onAccept={() =>
+                        acceptRequest(
+                            state.pendingPairRequests[0].deviceID
+                        )
+                    }
+                    onReject={() =>
+                        rejectRequest(
+                            state.pendingPairRequests[0].deviceID
+                        )
+                    }
+                />
+            )}
 
             <PageSection
                 title="Device Details"

@@ -2,6 +2,7 @@ package pairing
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"time"
 
@@ -19,6 +20,7 @@ type Service struct {
 	deviceService device.Service
 	udp           *udp.Broadcaster
 	pending       *PendingRegistry
+	sender        *udp.Sender
 }
 
 func New(
@@ -26,6 +28,7 @@ func New(
 	device *models.Device,
 	deviceService device.Service,
 	broadcaster *udp.Broadcaster,
+	sender *udp.Sender,
 	pending *PendingRegistry,
 ) *Service {
 
@@ -35,6 +38,7 @@ func New(
 		deviceService: deviceService,
 		udp:           broadcaster,
 		pending:       pending,
+		sender:        sender,
 	}
 }
 
@@ -83,7 +87,7 @@ func (s *Service) HandlePairRequest(
 			Name:      packet.Name,
 			Hostname:  packet.Hostname,
 			Platform:  packet.Platform,
-			Address:   addr.IP.String(),
+			Address:   addr,
 			CreatedAt: time.Now(),
 		},
 	)
@@ -116,7 +120,7 @@ func (s *Service) Pair(
 	}
 
 	envelope := &packetprotocol.Envelope{
-		Type:    packetprotocol.TypePairing,
+		Type:    packetprotocol.TypePairRequest,
 		Payload: payload,
 	}
 
@@ -128,4 +132,115 @@ func (s *Service) Pair(
 	}
 
 	return s.udp.Send(data)
+}
+
+func (s *Service) Accept(
+	deviceID string,
+) error {
+
+	request, ok := s.pending.Get(deviceID)
+	if !ok {
+		return fmt.Errorf(
+			"pending request not found",
+		)
+	}
+
+	if err := s.sendPairResponse(
+		request.Address,
+		true,
+		"",
+	); err != nil {
+		return err
+	}
+
+	s.pending.Remove(deviceID)
+
+	s.logger.Info(
+		"Pair request accepted",
+	)
+
+	return nil
+}
+
+func (s *Service) Reject(
+	deviceID string,
+) error {
+
+	request, ok := s.pending.Get(deviceID)
+	if !ok {
+		return fmt.Errorf(
+			"pending request not found",
+		)
+	}
+
+	if err := s.sendPairResponse(
+		request.Address,
+		false,
+		"Rejected by user",
+	); err != nil {
+		return err
+	}
+
+	s.pending.Remove(deviceID)
+
+	s.logger.Info(
+		"Pair request rejected",
+	)
+
+	return nil
+}
+
+func (s *Service) sendPairResponse(
+	addr *net.UDPAddr,
+	accepted bool,
+	reason string,
+) error {
+
+	packet := &models.PairResponse{
+		Version:  1,
+		DeviceID: s.device.ID,
+		Accepted: accepted,
+		Reason:   reason,
+	}
+
+	payload, err := pairingprotocol.EncodeResponse(packet)
+	if err != nil {
+		return err
+	}
+
+	envelope := &packetprotocol.Envelope{
+		Type:    packetprotocol.TypePairResponse,
+		Payload: payload,
+	}
+
+	data, err := packetprotocol.Encode(envelope)
+	if err != nil {
+		return err
+	}
+
+	return s.sender.Send(
+		data,
+		addr,
+	)
+}
+
+func (s *Service) HandlePairResponse(
+	packet *models.PairResponse,
+	addr *net.UDPAddr,
+) {
+
+	if packet.Accepted {
+
+		s.logger.Info(
+			"Pair request accepted",
+		)
+
+	} else {
+
+		s.logger.Info(
+			"Pair request rejected",
+		)
+
+	}
+
 }

@@ -24,6 +24,7 @@ func NewBroadcaster(
 	}
 }
 
+// Broadcsat
 func (b *Broadcaster) Send(
 	data []byte,
 ) error {
@@ -35,6 +36,29 @@ func (b *Broadcaster) Send(
 			"UDP Send failed",
 			zap.Error(err),
 		)
+	}
+
+	return err
+}
+
+// Unicast
+func (b *Broadcaster) SendTo(
+	data []byte,
+	addr *net.UDPAddr,
+) error {
+
+	_, err := b.conn.WriteToUDP(
+		data,
+		addr,
+	)
+
+	if err != nil {
+
+		b.logger.Error(
+			"UDP SendTo failed",
+			zap.Error(err),
+		)
+
 	}
 
 	return err

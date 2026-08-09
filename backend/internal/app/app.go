@@ -128,6 +128,10 @@ func New(
 		dispatcher,
 	)
 
+	udpSender := udp.NewSender(
+		appLogger,
+	)
+
 	// ------------------------------------------------------------------
 	// Services
 	// ------------------------------------------------------------------
@@ -165,6 +169,7 @@ func New(
 		device,
 		deviceService,
 		udpBroadcaster,
+		udpSender,
 		pendingRegistry,
 	)
 

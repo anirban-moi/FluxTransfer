@@ -1,6 +1,7 @@
 package pairing
 
 import (
+	"net"
 	"sync"
 	"time"
 )
@@ -10,7 +11,7 @@ type PendingRequest struct {
 	Name     string
 	Hostname string
 	Platform string
-	Address  string
+	Address  *net.UDPAddr
 
 	CreatedAt time.Time
 }

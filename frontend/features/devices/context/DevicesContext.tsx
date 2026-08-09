@@ -10,7 +10,10 @@ import {
 } from "react";
 
 // import { mockDevices } from "../constants/devices";
-import { getDevices, pairDevice as pairDeviceApi, } from "@/lib/api";
+import {
+    getDevices, getPendingPairRequests, pairDevice as pairDeviceApi, PendingPairRequest, acceptPairRequest,
+    rejectPairRequest,
+} from "@/lib/api";
 import type { Device } from "../types/device";
 
 type DevicesState = {
@@ -19,6 +22,7 @@ type DevicesState = {
     search: string;
     showOnlineOnly: boolean;
     isDiscovering: boolean;
+    pendingPairRequests: PendingPairRequest[];
 };
 
 type DevicesContextType = {
@@ -30,15 +34,18 @@ type DevicesContextType = {
     refreshDevices: () => Promise<void>;
     discoverDevices: () => void;
     pairDevice: (device: Device) => Promise<void>;
+    acceptRequest: (deviceID: string) => void;
+    rejectRequest: (deviceID: string) => void;
+    // pendingPairRequests: PendingPairRequest[];
 };
 
-// Mock initial state for development purposes. In a real application, you would fetch this data from an API or other data source.
 const initialState: DevicesState = {
     devices: [],
     selectedDevice: undefined,
     search: "",
     showOnlineOnly: false,
     isDiscovering: false,
+    pendingPairRequests: [],
 };
 
 const DevicesContext = createContext<DevicesContextType | null>(null);
@@ -51,7 +58,34 @@ export function DevicesProvider({
     const [state, setState] = useState<DevicesState>(initialState);
     useEffect(() => {
         fetchDevices();
+        fetchPendingPairRequests();
+
+        const interval = setInterval(() => {
+            fetchPendingPairRequests();
+        }, 1000);
+
+        return () => clearInterval(interval);
     }, []);
+
+    async function fetchPendingPairRequests() {
+
+        try {
+
+            const requests =
+                await getPendingPairRequests();
+
+            setState(prev => ({
+                ...prev,
+                pendingPairRequests: requests,
+            }));
+
+        } catch (error) {
+
+            console.error(error);
+
+        }
+
+    }
 
     function selectDevice(device: Device) {
         setState((prev) => ({
@@ -73,6 +107,26 @@ export function DevicesProvider({
             showOnlineOnly:
                 !prev.showOnlineOnly,
         }));
+    }
+
+    async function acceptRequest(
+        deviceID: string,
+    ) {
+
+        await acceptPairRequest(deviceID);
+
+        await fetchPendingPairRequests();
+
+    }
+
+    async function rejectRequest(
+        deviceID: string,
+    ) {
+
+        await rejectPairRequest(deviceID);
+
+        await fetchPendingPairRequests();
+
     }
 
     async function fetchDevices() {
@@ -178,6 +232,8 @@ export function DevicesProvider({
             refreshDevices,
             discoverDevices,
             pairDevice,
+            acceptRequest,
+            rejectRequest,
         }),
         [state]
     );

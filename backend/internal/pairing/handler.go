@@ -31,19 +31,37 @@ func (h *Handler) Handle(
 		return
 	}
 
-	if envelope.Type != packetprotocol.TypePairing {
+	switch envelope.Type {
+
+	case packetprotocol.TypePairRequest:
+
+		packet, err := pairingprotocol.DecodeRequest(
+			envelope.Payload,
+		)
+		if err != nil {
+			return
+		}
+
+		h.service.HandlePairRequest(
+			packet,
+			addr,
+		)
+
+	case packetprotocol.TypePairResponse:
+
+		packet, err := pairingprotocol.DecodeResponse(
+			envelope.Payload,
+		)
+		if err != nil {
+			return
+		}
+
+		h.service.HandlePairResponse(
+			packet,
+			addr,
+		)
+
+	default:
 		return
 	}
-
-	packet, err := pairingprotocol.DecodeRequest(
-		envelope.Payload,
-	)
-	if err != nil {
-		return
-	}
-
-	h.service.HandlePairRequest(
-		packet,
-		addr,
-	)
 }
