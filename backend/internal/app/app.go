@@ -3,13 +3,16 @@ package app
 import (
 	"time"
 
+	"github.com/anirban-moi/FluxTransfer/backend/internal/appdata"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/config"
 	deviceServicePkg "github.com/anirban-moi/FluxTransfer/backend/internal/device"
+	"github.com/anirban-moi/FluxTransfer/backend/internal/device/identity"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/discovery"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/heartbeat"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/logger"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/models"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/network/udp"
+	"github.com/anirban-moi/FluxTransfer/backend/internal/pairing"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/registry"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/server"
 )
@@ -17,10 +20,12 @@ import (
 type Application struct {
 	cfg            *config.Config
 	logger         *logger.Logger
+	identity       *identity.Identity
 	server         *server.Server
 	registry       registry.Registry
 	discovery      *discovery.Service
 	heartbeat      *heartbeat.Service
+	pairing        *pairing.Service
 	udpListener    *udp.Listener
 	udpDispatcher  *udp.Dispatcher
 	udpBroadcaster *udp.Broadcaster
@@ -40,6 +45,28 @@ func New(
 		return nil, err
 	}
 
+	// ------------------------------------------------------------
+	// Device Identity
+	// ------------------------------------------------------------
+
+	appDataDir, err := appdata.Directory()
+	if err != nil {
+		return nil, err
+	}
+
+	identityStorage := identity.NewStorage(
+		appDataDir,
+	)
+
+	identityService := identity.NewIdentityService(
+		identityStorage,
+	)
+
+	identityInfo, err := identityService.Load()
+	if err != nil {
+		return nil, err
+	}
+
 	// Device Registry
 	deviceRegistry := registry.New()
 
@@ -50,7 +77,7 @@ func New(
 
 	// Local Device
 	device := &models.Device{
-		ID:       "device-1",
+		ID:       identityInfo.DeviceID,
 		Name:     cfg.Device.Name,
 		Hostname: "localhost",
 		Platform: "windows",
@@ -137,6 +164,18 @@ func New(
 		heartbeat.NewHandler(heartbeatService),
 	)
 
+	// pairing services
+	pairingService := pairing.New(
+		appLogger,
+		device,
+		deviceService,
+		udpBroadcaster,
+	)
+
+	dispatcher.Register(
+		pairing.NewHandler(pairingService),
+	)
+
 	return &Application{
 		cfg:            cfg,
 		logger:         appLogger,
@@ -144,6 +183,7 @@ func New(
 		registry:       deviceRegistry,
 		discovery:      discoveryService,
 		heartbeat:      heartbeatService,
+		pairing:        pairingService,
 		udpListener:    udpListener,
 		udpDispatcher:  dispatcher,
 		udpBroadcaster: udpBroadcaster,

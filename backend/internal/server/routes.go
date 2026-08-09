@@ -18,6 +18,10 @@ func (s *Server) registerRoutes(
 		s.device,
 	)
 
+	pairingHandler := handlers.NewPairingHandler(
+		s.pairing,
+	)
+
 	mux.HandleFunc(
 		"GET /api/device",
 		deviceInfoHandler.Get,
@@ -26,6 +30,11 @@ func (s *Server) registerRoutes(
 	mux.HandleFunc(
 		"GET /api/devices",
 		deviceHandler.List,
+	)
+
+	mux.HandleFunc(
+		"POST /api/pairings",
+		pairingHandler.Pair,
 	)
 
 	mux.HandleFunc(

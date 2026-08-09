@@ -7,6 +7,7 @@ type Type string
 const (
 	TypeDiscovery Type = "discovery"
 	TypeHeartbeat Type = "heartbeat"
+	TypePairing        = "pairing"
 )
 
 type Envelope struct {

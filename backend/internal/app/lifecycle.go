@@ -56,6 +56,15 @@ func (a *Application) Run() error {
 
 	}
 
+	if err := a.pairing.Start(appCtx); err != nil {
+
+		a.logger.Fatal(
+			"Failed to start pairing service",
+			zap.Error(err),
+		)
+
+	}
+
 	// Start HTTP Server
 	go func() {
 		if err := a.server.Start(); err != nil {
@@ -114,6 +123,15 @@ func (a *Application) Run() error {
 			"Failed to shutdown discovery service",
 			zap.Error(err),
 		)
+	}
+
+	if err := a.pairing.Shutdown(shutdownCtx); err != nil {
+
+		a.logger.Error(
+			"Failed to shutdown pairing service",
+			zap.Error(err),
+		)
+
 	}
 
 	a.logger.Info("Backend stopped")

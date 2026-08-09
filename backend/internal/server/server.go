@@ -9,6 +9,7 @@ import (
 	"github.com/anirban-moi/FluxTransfer/backend/internal/config"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/logger"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/models"
+	"github.com/anirban-moi/FluxTransfer/backend/internal/pairing"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/registry"
 )
 
@@ -18,6 +19,7 @@ type Server struct {
 	registry   registry.Registry
 	device     *models.Device
 	httpServer *http.Server
+	pairing    *pairing.Service
 }
 
 func New(
