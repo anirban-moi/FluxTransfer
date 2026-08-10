@@ -33,14 +33,21 @@ async function request<T>(
     );
 
     if (!response.ok) {
+        const message = await response.text();
 
         throw new ApiError(
             response.status,
-            response.statusText,
+            message || response.statusText,
         );
     }
 
     if (response.status === 204 || response.status === 202) {
+        return undefined as T;
+    }
+
+    const contentType = response.headers.get("content-type");
+
+    if (!contentType?.includes("application/json")) {
         return undefined as T;
     }
 

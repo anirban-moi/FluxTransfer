@@ -87,11 +87,14 @@ func (s *Service) HandlePairRequest(
 
 	s.pending.Add(
 		&PendingRequest{
-			DeviceID:  packet.DeviceID,
-			Name:      packet.Name,
-			Hostname:  packet.Hostname,
-			Platform:  packet.Platform,
-			Address:   addr,
+			DeviceID: packet.DeviceID,
+			Name:     packet.Name,
+			Hostname: packet.Hostname,
+			Platform: packet.Platform,
+			Address: &net.UDPAddr{
+				IP:   addr.IP,
+				Port: 53317,
+			},
 			CreatedAt: time.Now(),
 		},
 	)

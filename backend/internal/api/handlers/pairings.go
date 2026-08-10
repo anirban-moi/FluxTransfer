@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/anirban-moi/FluxTransfer/backend/internal/pairing"
@@ -54,6 +55,9 @@ func (h *PairingsHandler) Accept(
 	}
 
 	if err := h.service.Accept(request.DeviceID); err != nil {
+
+		log.Println(err)
+
 		http.Error(
 			w,
 			err.Error(),
