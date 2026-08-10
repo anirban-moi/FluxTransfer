@@ -41,7 +41,7 @@ export function IncomingPairDialog({
                     </p>
 
                     <p className="text-sm text-muted-foreground">
-                        {request.address}
+                        {request.address.IP}:{request.address.Port}
                     </p>
                 </div>
 

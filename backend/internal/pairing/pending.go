@@ -7,13 +7,12 @@ import (
 )
 
 type PendingRequest struct {
-	DeviceID string
-	Name     string
-	Hostname string
-	Platform string
-	Address  *net.UDPAddr
-
-	CreatedAt time.Time
+	DeviceID  string       `json:"deviceId"`
+	Name      string       `json:"name"`
+	Hostname  string       `json:"hostname"`
+	Platform  string       `json:"platform"`
+	Address   *net.UDPAddr `json:"address"`
+	CreatedAt time.Time    `json:"createdAt"`
 }
 
 type PendingRegistry struct {

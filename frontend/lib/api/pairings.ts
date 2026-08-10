@@ -1,11 +1,15 @@
 import { apiClient } from "./client";
 
 export type PendingPairRequest = {
-    deviceID: string;
+    deviceId: string;
     name: string;
     hostname: string;
     platform: string;
-    address: string;
+    address: {
+        IP: string;
+        Port: number;
+        Zone: string;
+    };
     createdAt: string;
 };
 

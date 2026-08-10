@@ -73,12 +73,12 @@ function DevicesWorkflow() {
                     request={state.pendingPairRequests[0]}
                     onAccept={() =>
                         acceptRequest(
-                            state.pendingPairRequests[0].deviceID
+                            state.pendingPairRequests[0].deviceId
                         )
                     }
                     onReject={() =>
                         rejectRequest(
-                            state.pendingPairRequests[0].deviceID
+                            state.pendingPairRequests[0].deviceId
                         )
                     }
                 />
