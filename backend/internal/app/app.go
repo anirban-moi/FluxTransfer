@@ -15,6 +15,7 @@ import (
 	"github.com/anirban-moi/FluxTransfer/backend/internal/pairing"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/registry"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/server"
+	"github.com/anirban-moi/FluxTransfer/backend/internal/trusted"
 )
 
 type Application struct {
@@ -26,6 +27,7 @@ type Application struct {
 	discovery      *discovery.Service
 	heartbeat      *heartbeat.Service
 	pairing        *pairing.Service
+	trusted        *trusted.Service
 	udpListener    *udp.Listener
 	udpDispatcher  *udp.Dispatcher
 	udpBroadcaster *udp.Broadcaster
@@ -164,6 +166,18 @@ func New(
 
 	pendingRegistry := pairing.NewPendingRegistry()
 
+	trustedRepository, err := trusted.NewJSONRepository(
+		"data/trusted_devices.json",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	trustedService := trusted.NewService(
+		trustedRepository,
+	)
+
+	// pairing servicesx
 	pairingService := pairing.New(
 		appLogger,
 		device,
@@ -171,6 +185,7 @@ func New(
 		udpBroadcaster,
 		udpSender,
 		pendingRegistry,
+		trustedService,
 	)
 
 	// HTTP Server
@@ -194,6 +209,7 @@ func New(
 		discovery:      discoveryService,
 		heartbeat:      heartbeatService,
 		pairing:        pairingService,
+		trusted:        trustedService,
 		udpListener:    udpListener,
 		udpDispatcher:  dispatcher,
 		udpBroadcaster: udpBroadcaster,

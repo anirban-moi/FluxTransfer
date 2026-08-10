@@ -12,15 +12,17 @@ import (
 	"github.com/anirban-moi/FluxTransfer/backend/internal/network/udp"
 	packetprotocol "github.com/anirban-moi/FluxTransfer/backend/internal/protocol/packet"
 	pairingprotocol "github.com/anirban-moi/FluxTransfer/backend/internal/protocol/pairing"
+	"github.com/anirban-moi/FluxTransfer/backend/internal/trusted"
 )
 
 type Service struct {
-	logger        *logger.Logger
-	device        *models.Device
-	deviceService device.Service
-	udp           *udp.Broadcaster
-	pending       *PendingRegistry
-	sender        *udp.Sender
+	logger         *logger.Logger
+	device         *models.Device
+	deviceService  device.Service
+	udp            *udp.Broadcaster
+	pending        *PendingRegistry
+	sender         *udp.Sender
+	trustedService *trusted.Service
 }
 
 func New(
@@ -30,15 +32,17 @@ func New(
 	broadcaster *udp.Broadcaster,
 	sender *udp.Sender,
 	pending *PendingRegistry,
+	trustedService *trusted.Service,
 ) *Service {
 
 	return &Service{
-		logger:        log,
-		device:        device,
-		deviceService: deviceService,
-		udp:           broadcaster,
-		pending:       pending,
-		sender:        sender,
+		logger:         log,
+		device:         device,
+		deviceService:  deviceService,
+		udp:            broadcaster,
+		pending:        pending,
+		sender:         sender,
+		trustedService: trustedService,
 	}
 }
 
@@ -152,12 +156,37 @@ func (s *Service) Accept(
 		)
 	}
 
+	now := time.Now()
+
+	trustedDevice := &models.TrustedDevice{
+		DeviceID:  request.DeviceID,
+		Name:      request.Name,
+		Hostname:  request.Hostname,
+		Platform:  request.Platform,
+		Version:   "",
+		PublicKey: "",
+		PairedAt:  now,
+		LastSeen:  now,
+	}
+
+	if err := s.trustedService.Add(
+		trustedDevice,
+	); err != nil {
+		return fmt.Errorf(
+			"failed to save trusted device: %w",
+			err,
+		)
+	}
+
 	if err := s.sendPairResponse(
 		request.Address,
 		true,
 		"",
 	); err != nil {
-		return err
+		return fmt.Errorf(
+			"failed to send pair response: %w",
+			err,
+		)
 	}
 
 	s.pending.Remove(deviceID)
@@ -231,23 +260,75 @@ func (s *Service) sendPairResponse(
 	)
 }
 
+// func (s *Service) HandlePairResponse(
+// 	packet *models.PairResponse,
+// 	addr *net.UDPAddr,
+// ) {
+
+// 	if packet.Accepted {
+
+// 		s.logger.Info(
+// 			"Pair request accepted",
+// 		)
+
+// 	} else {
+
+// 		s.logger.Info(
+// 			"Pair request rejected",
+// 		)
+
+// 	}
+
+// }
+
 func (s *Service) HandlePairResponse(
-	packet *models.PairResponse,
+	response *models.PairResponse,
 	addr *net.UDPAddr,
 ) {
-
-	if packet.Accepted {
-
-		s.logger.Info(
-			"Pair request accepted",
-		)
-
-	} else {
-
+	if !response.Accepted {
 		s.logger.Info(
 			"Pair request rejected",
 		)
 
+		return
 	}
 
+	device, ok := s.deviceService.Get(
+		response.DeviceID,
+	)
+
+	if !ok {
+		s.logger.Error(
+			"Paired device not found in registry",
+		)
+
+		return
+	}
+
+	now := time.Now()
+
+	trustedDevice := &models.TrustedDevice{
+		DeviceID:  device.ID,
+		Name:      device.Name,
+		Hostname:  device.Hostname,
+		Platform:  device.Platform,
+		Version:   device.Version,
+		PublicKey: "",
+		PairedAt:  now,
+		LastSeen:  now,
+	}
+
+	if err := s.trustedService.Add(
+		trustedDevice,
+	); err != nil {
+		s.logger.Error(
+			"Failed to save trusted device",
+		)
+
+		return
+	}
+
+	s.logger.Info(
+		"Trusted device added",
+	)
 }
