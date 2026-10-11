@@ -38,9 +38,14 @@ func Dial(
 		return nil, err
 	}
 
-	return net.DialUDP(
+	conn, err := net.DialUDP(
 		"udp4",
 		nil,
 		addr,
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	return conn, nil
 }

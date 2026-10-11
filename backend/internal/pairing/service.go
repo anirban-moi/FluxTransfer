@@ -84,21 +84,17 @@ func (s *Service) HandlePairRequest(
 	packet *models.PairRequest,
 	addr *net.UDPAddr,
 ) {
-
 	if packet.DeviceID == s.device.ID {
 		return
 	}
 
 	s.pending.Add(
 		&PendingRequest{
-			DeviceID: packet.DeviceID,
-			Name:     packet.Name,
-			Hostname: packet.Hostname,
-			Platform: packet.Platform,
-			Address: &net.UDPAddr{
-				IP:   addr.IP,
-				Port: 53317,
-			},
+			DeviceID:  packet.DeviceID,
+			Name:      packet.Name,
+			Hostname:  packet.Hostname,
+			Platform:  packet.Platform,
+			Address:   addr,
 			CreatedAt: time.Now(),
 		},
 	)
@@ -106,7 +102,6 @@ func (s *Service) HandlePairRequest(
 	s.logger.Info(
 		"Pair request received",
 	)
-
 }
 
 func (s *Service) PendingRequests() []*PendingRequest {
@@ -116,10 +111,24 @@ func (s *Service) PendingRequests() []*PendingRequest {
 func (s *Service) Pair(
 	deviceID string,
 ) error {
-
 	s.logger.Info(
 		"Sending pair request",
 	)
+
+	targetDevice, ok := s.deviceService.Get(deviceID)
+	if !ok {
+		return fmt.Errorf(
+			"device not found: %s",
+			deviceID,
+		)
+	}
+
+	if targetDevice.IPAddress == "" {
+		return fmt.Errorf(
+			"device %s has no IP address",
+			deviceID,
+		)
+	}
 
 	request := s.PairRequest()
 
@@ -142,7 +151,23 @@ func (s *Service) Pair(
 		return err
 	}
 
-	return s.udp.Send(data)
+	targetAddr := &net.UDPAddr{
+		IP:   net.ParseIP(targetDevice.IPAddress),
+		Port: targetDevice.Port,
+	}
+
+	if targetAddr.IP == nil {
+		return fmt.Errorf(
+			"invalid IP address for device %s: %s",
+			deviceID,
+			targetDevice.IPAddress,
+		)
+	}
+
+	return s.sender.Send(
+		data,
+		targetAddr,
+	)
 }
 
 func (s *Service) Accept(
