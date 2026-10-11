@@ -90,11 +90,14 @@ func (s *Service) HandlePairRequest(
 
 	s.pending.Add(
 		&PendingRequest{
-			DeviceID:  packet.DeviceID,
-			Name:      packet.Name,
-			Hostname:  packet.Hostname,
-			Platform:  packet.Platform,
-			Address:   addr,
+			DeviceID: packet.DeviceID,
+			Name:     packet.Name,
+			Hostname: packet.Hostname,
+			Platform: packet.Platform,
+			Address: &net.UDPAddr{
+				IP:   addr.IP,
+				Port: 53317,
+			},
 			CreatedAt: time.Now(),
 		},
 	)
@@ -153,7 +156,7 @@ func (s *Service) Pair(
 
 	targetAddr := &net.UDPAddr{
 		IP:   net.ParseIP(targetDevice.IPAddress),
-		Port: targetDevice.Port,
+		Port: 53317,
 	}
 
 	if targetAddr.IP == nil {
@@ -310,7 +313,11 @@ func (s *Service) HandlePairResponse(
 	response *models.PairResponse,
 	addr *net.UDPAddr,
 ) {
-	if !response.Accepted {
+	if response.Accepted {
+		s.logger.Info(
+			"Pair request accepted",
+		)
+	} else {
 		s.logger.Info(
 			"Pair request rejected",
 		)
