@@ -15,6 +15,12 @@ export type DeviceTrust =
     | "untrusted"
     | "pending";
 
+export type DevicePairingStatus =
+    | "unpaired"
+    | "pending"
+    | "paired"
+    | "rejected";
+
 export type TransferState =
     | "idle"
     | "sending"
@@ -40,6 +46,7 @@ export interface Device {
     platform: DevicePlatform;
     status: DeviceStatus;
     trust: DeviceTrust;
+    pairingStatus?: DevicePairingStatus;
     transferState: TransferState;
     lastSeen?: Date;
     fingerprint: string;

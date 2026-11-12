@@ -12,6 +12,7 @@ func (s *Server) registerRoutes(
 
 	deviceHandler := handlers.NewDeviceHandler(
 		s.registry,
+		s.pairing,
 	)
 
 	deviceInfoHandler := handlers.NewDeviceInfoHandler(

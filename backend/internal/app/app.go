@@ -126,6 +126,7 @@ func New(
 	dispatcher := udp.NewDispatcher()
 
 	udpListener := udp.NewListener(
+		appLogger,
 		udpListenerConn,
 		dispatcher,
 	)

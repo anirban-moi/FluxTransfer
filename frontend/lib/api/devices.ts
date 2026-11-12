@@ -16,11 +16,15 @@ type DeviceResponse = {
     version: string;
     status: string;
     lastSeen: string;
+    isTrusted?: boolean;
+    pairingStatus?: "unpaired" | "pending" | "paired" | "rejected";
 };
 
 function mapDevice(
     device: DeviceResponse,
 ): Device {
+    const isPaired = device.isTrusted || device.pairingStatus === "paired";
+    const isPending = device.pairingStatus === "pending";
 
     return {
         id: device.id,
@@ -31,7 +35,8 @@ function mapDevice(
         lastSeen: device.lastSeen
             ? new Date(device.lastSeen)
             : undefined,
-        trust: "trusted",
+        trust: isPaired ? "trusted" : isPending ? "pending" : "untrusted",
+        pairingStatus: device.pairingStatus ?? (isPaired ? "paired" : "unpaired"),
         transferState: "idle",
         fingerprint: "",
         network: {

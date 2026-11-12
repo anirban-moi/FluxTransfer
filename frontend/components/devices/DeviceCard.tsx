@@ -106,16 +106,33 @@ export function DeviceCard({
                         </span>
 
                     </div>
-                    <Button
-                        size="sm"
-                        disabled={device.status !== "online"}
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            onPair?.(device);
-                        }}
-                    >
-                        Pair
-                    </Button>
+                    <div className="mt-3 flex items-center gap-2">
+                        {device.trust === "trusted" || device.pairingStatus === "paired" ? (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-green-500/10 px-2 py-1 text-xs font-medium text-green-600 dark:text-green-400">
+                                <CheckCircle2 className="size-3.5" /> Paired
+                            </span>
+                        ) : device.trust === "pending" || device.pairingStatus === "pending" ? (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                disabled
+                                className="h-8 text-xs"
+                            >
+                                <LoaderCircle className="size-3 animate-spin mr-1.5" /> Pairing...
+                            </Button>
+                        ) : (
+                            <Button
+                                size="sm"
+                                disabled={device.status !== "online"}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    onPair?.(device);
+                                }}
+                            >
+                                Pair
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
                 {/* Activity */}

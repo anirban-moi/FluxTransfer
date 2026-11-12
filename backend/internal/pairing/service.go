@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/anirban-moi/FluxTransfer/backend/internal/device"
@@ -13,6 +14,16 @@ import (
 	packetprotocol "github.com/anirban-moi/FluxTransfer/backend/internal/protocol/packet"
 	pairingprotocol "github.com/anirban-moi/FluxTransfer/backend/internal/protocol/pairing"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/trusted"
+	"go.uber.org/zap"
+)
+
+type PairingStatus string
+
+const (
+	PairingStatusUnpaired PairingStatus = "unpaired"
+	PairingStatusPending  PairingStatus = "pending"
+	PairingStatusPaired   PairingStatus = "paired"
+	PairingStatusRejected PairingStatus = "rejected"
 )
 
 type Service struct {
@@ -23,6 +34,9 @@ type Service struct {
 	pending        *PendingRegistry
 	sender         *udp.Sender
 	trustedService *trusted.Service
+
+	mu             sync.RWMutex
+	outgoingStatus map[string]PairingStatus
 }
 
 func New(
@@ -43,6 +57,7 @@ func New(
 		pending:        pending,
 		sender:         sender,
 		trustedService: trustedService,
+		outgoingStatus: make(map[string]PairingStatus),
 	}
 }
 
@@ -88,22 +103,28 @@ func (s *Service) HandlePairRequest(
 		return
 	}
 
+	replyAddr := &net.UDPAddr{
+		IP:   addr.IP,
+		Port: 53317,
+	}
+
 	s.pending.Add(
 		&PendingRequest{
 			DeviceID: packet.DeviceID,
 			Name:     packet.Name,
 			Hostname: packet.Hostname,
 			Platform: packet.Platform,
-			Address: &net.UDPAddr{
-				IP:   addr.IP,
-				Port: 53317,
-			},
+			Address:  replyAddr,
 			CreatedAt: time.Now(),
 		},
 	)
 
 	s.logger.Info(
 		"Pair request received",
+		zap.String("fromDevice", packet.Name),
+		zap.String("fromDeviceID", packet.DeviceID),
+		zap.String("fromAddress", addr.String()),
+		zap.String("replyAddress", replyAddr.String()),
 	)
 }
 
@@ -114,10 +135,6 @@ func (s *Service) PendingRequests() []*PendingRequest {
 func (s *Service) Pair(
 	deviceID string,
 ) error {
-	s.logger.Info(
-		"Sending pair request",
-	)
-
 	targetDevice, ok := s.deviceService.Get(deviceID)
 	if !ok {
 		return fmt.Errorf(
@@ -132,6 +149,30 @@ func (s *Service) Pair(
 			deviceID,
 		)
 	}
+
+	targetAddr := &net.UDPAddr{
+		IP:   net.ParseIP(targetDevice.IPAddress),
+		Port: 53317,
+	}
+
+	if targetAddr.IP == nil {
+		return fmt.Errorf(
+			"invalid IP address for device %s: %s",
+			deviceID,
+			targetDevice.IPAddress,
+		)
+	}
+
+	s.logger.Info(
+		"Sending pair request",
+		zap.String("targetDevice", targetDevice.Name),
+		zap.String("targetDeviceID", targetDevice.ID),
+		zap.String("targetAddress", targetAddr.String()),
+	)
+
+	s.mu.Lock()
+	s.outgoingStatus[deviceID] = PairingStatusPending
+	s.mu.Unlock()
 
 	request := s.PairRequest()
 
@@ -154,23 +195,23 @@ func (s *Service) Pair(
 		return err
 	}
 
-	targetAddr := &net.UDPAddr{
-		IP:   net.ParseIP(targetDevice.IPAddress),
-		Port: 53317,
-	}
-
-	if targetAddr.IP == nil {
-		return fmt.Errorf(
-			"invalid IP address for device %s: %s",
-			deviceID,
-			targetDevice.IPAddress,
-		)
-	}
-
-	return s.sender.Send(
+	err = s.sender.Send(
 		data,
 		targetAddr,
 	)
+	if err != nil {
+		s.logger.Error(
+			"Failed to send pair request",
+			zap.String("targetAddress", targetAddr.String()),
+			zap.Error(err),
+		)
+		s.mu.Lock()
+		delete(s.outgoingStatus, deviceID)
+		s.mu.Unlock()
+		return err
+	}
+
+	return nil
 }
 
 func (s *Service) Accept(
@@ -206,6 +247,12 @@ func (s *Service) Accept(
 		)
 	}
 
+	s.logger.Info(
+		"Pair request accepted locally, notifying sender",
+		zap.String("remoteDeviceID", deviceID),
+		zap.String("destinationAddress", request.Address.String()),
+	)
+
 	if err := s.sendPairResponse(
 		request.Address,
 		true,
@@ -220,7 +267,8 @@ func (s *Service) Accept(
 	s.pending.Remove(deviceID)
 
 	s.logger.Info(
-		"Pair request accepted",
+		"Pair request accepted and response dispatched",
+		zap.String("remoteDeviceID", deviceID),
 	)
 
 	return nil
@@ -237,6 +285,12 @@ func (s *Service) Reject(
 		)
 	}
 
+	s.logger.Info(
+		"Pair request rejected locally, notifying sender",
+		zap.String("remoteDeviceID", deviceID),
+		zap.String("destinationAddress", request.Address.String()),
+	)
+
 	if err := s.sendPairResponse(
 		request.Address,
 		false,
@@ -248,7 +302,8 @@ func (s *Service) Reject(
 	s.pending.Remove(deviceID)
 
 	s.logger.Info(
-		"Pair request rejected",
+		"Pair request rejected and response dispatched",
+		zap.String("remoteDeviceID", deviceID),
 	)
 
 	return nil
@@ -260,6 +315,13 @@ func (s *Service) sendPairResponse(
 	reason string,
 ) error {
 
+	s.logger.Info(
+		"Sending pair response packet",
+		zap.String("destinationAddress", addr.String()),
+		zap.Bool("accepted", accepted),
+		zap.String("reason", reason),
+	)
+
 	packet := &models.PairResponse{
 		Version:  1,
 		DeviceID: s.device.ID,
@@ -269,6 +331,10 @@ func (s *Service) sendPairResponse(
 
 	payload, err := pairingprotocol.EncodeResponse(packet)
 	if err != nil {
+		s.logger.Error(
+			"Failed to encode pair response payload",
+			zap.Error(err),
+		)
 		return err
 	}
 
@@ -279,49 +345,59 @@ func (s *Service) sendPairResponse(
 
 	data, err := packetprotocol.Encode(envelope)
 	if err != nil {
+		s.logger.Error(
+			"Failed to encode pair response envelope",
+			zap.Error(err),
+		)
 		return err
 	}
 
-	return s.sender.Send(
+	err = s.sender.Send(
 		data,
 		addr,
 	)
+	if err != nil {
+		s.logger.Error(
+			"Failed to send pair response via UDP",
+			zap.String("destinationAddress", addr.String()),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	s.logger.Info(
+		"Pair response UDP packet sent successfully",
+		zap.String("destinationAddress", addr.String()),
+	)
+
+	return nil
 }
-
-// func (s *Service) HandlePairResponse(
-// 	packet *models.PairResponse,
-// 	addr *net.UDPAddr,
-// ) {
-
-// 	if packet.Accepted {
-
-// 		s.logger.Info(
-// 			"Pair request accepted",
-// 		)
-
-// 	} else {
-
-// 		s.logger.Info(
-// 			"Pair request rejected",
-// 		)
-
-// 	}
-
-// }
 
 func (s *Service) HandlePairResponse(
 	response *models.PairResponse,
 	addr *net.UDPAddr,
 ) {
-	if response.Accepted {
-		s.logger.Info(
-			"Pair request accepted",
-		)
-	} else {
-		s.logger.Info(
-			"Pair request rejected",
-		)
+	s.logger.Info(
+		"Pair response received",
+		zap.String("fromAddress", addr.String()),
+		zap.String("fromDeviceID", response.DeviceID),
+		zap.Bool("accepted", response.Accepted),
+		zap.String("reason", response.Reason),
+	)
 
+	s.mu.Lock()
+	if response.Accepted {
+		s.outgoingStatus[response.DeviceID] = PairingStatusPaired
+	} else {
+		s.outgoingStatus[response.DeviceID] = PairingStatusRejected
+	}
+	s.mu.Unlock()
+
+	if !response.Accepted {
+		s.logger.Info(
+			"Pair request rejected by remote device",
+			zap.String("remoteDeviceID", response.DeviceID),
+		)
 		return
 	}
 
@@ -332,8 +408,8 @@ func (s *Service) HandlePairResponse(
 	if !ok {
 		s.logger.Error(
 			"Paired device not found in registry",
+			zap.String("remoteDeviceID", response.DeviceID),
 		)
-
 		return
 	}
 
@@ -355,12 +431,29 @@ func (s *Service) HandlePairResponse(
 	); err != nil {
 		s.logger.Error(
 			"Failed to save trusted device",
+			zap.Error(err),
 		)
-
 		return
 	}
 
 	s.logger.Info(
 		"Trusted device added",
+		zap.String("deviceName", device.Name),
+		zap.String("deviceID", device.ID),
 	)
+}
+
+func (s *Service) GetDevicePairingState(deviceID string) (bool, string) {
+	if _, ok := s.trustedService.Get(deviceID); ok {
+		return true, string(PairingStatusPaired)
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if st, ok := s.outgoingStatus[deviceID]; ok {
+		return false, string(st)
+	}
+
+	return false, string(PairingStatusUnpaired)
 }

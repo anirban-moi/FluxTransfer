@@ -62,7 +62,8 @@ export function DevicesProvider({
 
         const interval = setInterval(() => {
             fetchPendingPairRequests();
-        }, 1000);
+            fetchDevices();
+        }, 1500);
 
         return () => clearInterval(interval);
     }, []);
@@ -132,14 +133,18 @@ export function DevicesProvider({
     async function fetchDevices() {
         try {
             const devices = await getDevices();
-            setState((prev) => ({
-                ...prev,
-                devices,
-                selectedDevice:
-                    devices.length > 0
-                        ? devices[0]
-                        : undefined,
-            }));
+            setState((prev) => {
+                const currentSelected = prev.selectedDevice;
+                const updatedSelected = currentSelected
+                    ? devices.find((d) => d.id === currentSelected.id) || (devices.length > 0 ? devices[0] : undefined)
+                    : (devices.length > 0 ? devices[0] : undefined);
+
+                return {
+                    ...prev,
+                    devices,
+                    selectedDevice: updatedSelected,
+                };
+            });
         } catch (error) {
             console.error(
                 "Failed to load devices",
@@ -174,9 +179,16 @@ export function DevicesProvider({
     async function pairDevice(
         device: Device,
     ) {
+        setState((prev) => ({
+            ...prev,
+            devices: prev.devices.map((d) =>
+                d.id === device.id
+                    ? { ...d, trust: "pending", pairingStatus: "pending" }
+                    : d
+            ),
+        }));
 
         try {
-
             await pairDeviceApi(
                 device.id,
             );
@@ -185,16 +197,13 @@ export function DevicesProvider({
                 "Pair request sent:",
                 device.name,
             );
-
         } catch (error) {
-
             console.error(
                 "Failed to pair device",
                 error,
             );
-
+            fetchDevices();
         }
-
     }
 
     const visibleDevices = useMemo(() => {

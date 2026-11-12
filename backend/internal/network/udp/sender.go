@@ -32,21 +32,31 @@ func (s *Sender) Send(
 		addr,
 	)
 	if err != nil {
+		s.logger.Error(
+			"UDP Dial failed",
+			zap.String("destinationAddress", addr.String()),
+			zap.Error(err),
+		)
 		return err
 	}
 
 	defer conn.Close()
 
-	_, err = conn.Write(data)
+	n, err := conn.Write(data)
 	if err != nil {
-
 		s.logger.Error(
 			"UDP Send failed",
+			zap.String("destinationAddress", addr.String()),
 			zap.Error(err),
 		)
-
+		return err
 	}
 
-	return err
+	s.logger.Debug(
+		"UDP packet sent",
+		zap.String("destinationAddress", addr.String()),
+		zap.Int("bytes", n),
+	)
 
+	return nil
 }

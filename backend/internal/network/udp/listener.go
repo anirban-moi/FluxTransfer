@@ -4,20 +4,25 @@ import (
 	"context"
 	"net"
 	"time"
+
+	"github.com/anirban-moi/FluxTransfer/backend/internal/logger"
+	"go.uber.org/zap"
 )
 
 type Listener struct {
-	conn *net.UDPConn
-
+	logger  *logger.Logger
+	conn    *net.UDPConn
 	handler Handler
 }
 
 func NewListener(
+	log *logger.Logger,
 	conn *net.UDPConn,
 	handler Handler,
 ) *Listener {
 
 	return &Listener{
+		logger:  log,
 		conn:    conn,
 		handler: handler,
 	}
@@ -54,6 +59,14 @@ func (l *Listener) Listen(
 				}
 
 				return err
+			}
+
+			if l.logger != nil {
+				l.logger.Debug(
+					"UDP packet read from socket",
+					zap.String("fromAddress", addr.String()),
+					zap.Int("bytes", n),
+				)
 			}
 
 			l.handler.Handle(

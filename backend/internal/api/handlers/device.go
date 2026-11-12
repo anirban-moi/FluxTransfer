@@ -27,6 +27,10 @@ func (h *DeviceInfoHandler) Get(
 	JSON(
 		w,
 		http.StatusOK,
-		h.device,
+		DeviceResponse{
+			Device:        h.device,
+			IsTrusted:     true,
+			PairingStatus: "paired",
+		},
 	)
 }
