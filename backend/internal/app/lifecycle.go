@@ -65,6 +65,15 @@ func (a *Application) Run() error {
 
 	}
 
+	if err := a.transfer.Start(appCtx); err != nil {
+
+		a.logger.Fatal(
+			"Failed to start transfer service",
+			zap.Error(err),
+		)
+
+	}
+
 	// Start HTTP Server
 	go func() {
 		if err := a.server.Start(); err != nil {
@@ -129,6 +138,15 @@ func (a *Application) Run() error {
 
 		a.logger.Error(
 			"Failed to shutdown pairing service",
+			zap.Error(err),
+		)
+
+	}
+
+	if err := a.transfer.Shutdown(shutdownCtx); err != nil {
+
+		a.logger.Error(
+			"Failed to shutdown transfer service",
 			zap.Error(err),
 		)
 

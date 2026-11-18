@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-
 import {
+    AlertCircle,
     Clock3,
     Pause,
     Play,
@@ -26,49 +25,9 @@ export function TransferProgress() {
         pauseTransfer,
         resumeTransfer,
         cancelTransfer,
-        updateProgress,
-        completeTransfer,
     } = useSendTransfer();
 
     const progress = state.progress;
-
-    useEffect(() => {
-        if (progress.status !== "running") {
-            return;
-        }
-
-        const timer = setInterval(() => {
-            const nextPercentage = Math.min(
-                progress.percentage + 5,
-                100
-            );
-
-            updateProgress({
-                percentage: nextPercentage,
-                transferredBytes:
-                    (progress.totalBytes * nextPercentage) /
-                    100,
-                speed: 85 * 1024 * 1024,
-                remainingSeconds: Math.max(
-                    0,
-                    Math.floor((100 - nextPercentage) / 5)
-                ),
-            });
-
-            if (nextPercentage >= 100) {
-                clearInterval(timer);
-                completeTransfer();
-            }
-        }, 500);
-
-        return () => clearInterval(timer);
-    }, [
-        progress.status,
-        progress.percentage,
-        progress.totalBytes,
-        updateProgress,
-        completeTransfer,
-    ]);
 
     return (
         <Card>
@@ -77,6 +36,15 @@ export function TransferProgress() {
             </CardHeader>
 
             <CardContent className="space-y-6">
+                {progress.status === "failed" && progress.error && (
+                    <div className="flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+                        <AlertCircle className="size-5 shrink-0" />
+                        <div>
+                            <p className="font-semibold">Transfer Failed</p>
+                            <p className="text-xs opacity-90">{progress.error}</p>
+                        </div>
+                    </div>
+                )}
                 <div className="flex items-center justify-between">
                     <span className="font-medium">
                         Status

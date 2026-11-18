@@ -12,6 +12,14 @@ func Validate(cfg *Config) error {
 		return fmt.Errorf("discovery.port must be greater than zero")
 	}
 
+	if cfg.Transfer.Port <= 0 {
+		cfg.Transfer.Port = 53318
+	}
+
+	if cfg.Transfer.SaveDir == "" {
+		cfg.Transfer.SaveDir = "./downloads"
+	}
+
 	if cfg.Transfer.ChunkSize <= 0 {
 		return fmt.Errorf("transfer.chunkSize must be greater than zero")
 	}

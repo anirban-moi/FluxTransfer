@@ -11,6 +11,7 @@ import (
 	"github.com/anirban-moi/FluxTransfer/backend/internal/models"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/pairing"
 	"github.com/anirban-moi/FluxTransfer/backend/internal/registry"
+	"github.com/anirban-moi/FluxTransfer/backend/internal/transfer"
 )
 
 type Server struct {
@@ -20,6 +21,7 @@ type Server struct {
 	device     *models.Device
 	httpServer *http.Server
 	pairing    *pairing.Service
+	transfer   *transfer.Service
 }
 
 func New(
@@ -28,6 +30,7 @@ func New(
 	reg registry.Registry,
 	device *models.Device,
 	pairingService *pairing.Service,
+	transferService *transfer.Service,
 ) *Server {
 
 	return &Server{
@@ -36,6 +39,7 @@ func New(
 		registry:   reg,
 		device:     device,
 		pairing:    pairingService,
+		transfer:   transferService,
 		httpServer: nil,
 	}
 }

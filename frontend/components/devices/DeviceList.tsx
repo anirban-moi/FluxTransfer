@@ -12,13 +12,16 @@ type DeviceListProps = {
     onSelect?: (device: Device) => void;
 
     onPair?: (device: Device) => void;
+
+    onUnpair?: (device: Device) => void;
 };
 
 export function DeviceList({
     devices,
     selectedDeviceId,
     onSelect,
-    onPair
+    onPair,
+    onUnpair,
 }: DeviceListProps) {
     if (devices.length === 0) {
         return (
@@ -43,6 +46,7 @@ export function DeviceList({
                         device={device}
                         onClick={onSelect}
                         onPair={onPair}
+                        onUnpair={onUnpair}
                     />
                 </div>
             ))}

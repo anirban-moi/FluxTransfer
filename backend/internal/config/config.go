@@ -20,8 +20,11 @@ type DiscoveryConfig struct {
 }
 
 type TransferConfig struct {
+	Host      string
+	Port      int
 	ChunkSize int
 	Timeout   int
+	SaveDir   string
 }
 
 type Config struct {

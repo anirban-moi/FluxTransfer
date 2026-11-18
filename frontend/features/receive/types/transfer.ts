@@ -20,6 +20,8 @@ export interface IncomingTransfer {
     transferName: string;
     totalFiles: number;
     totalSize: number;
+    senderId?: string;
+    checksum?: string;
 }
 
 export interface ReceiveOptions {
@@ -38,6 +40,7 @@ export interface ReceiveProgress {
     speed: number;
     remainingSeconds: number;
     currentFile: string;
+    error?: string;
 }
 
 export interface ReceiveTransferState {

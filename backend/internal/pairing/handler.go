@@ -1,6 +1,7 @@
 package pairing
 
 import (
+	"encoding/json"
 	"net"
 
 	packetprotocol "github.com/anirban-moi/FluxTransfer/backend/internal/protocol/packet"
@@ -81,6 +82,25 @@ func (h *Handler) Handle(
 			packet,
 			addr,
 		)
+
+	case packetprotocol.TypeUnpair:
+		h.service.logger.Info(
+			"Unpair notification UDP packet arrived at handler",
+			zap.String("fromAddress", addr.String()),
+		)
+
+		var unpairPacket struct {
+			DeviceID string `json:"deviceId"`
+		}
+		if err := json.Unmarshal(envelope.Payload, &unpairPacket); err != nil {
+			h.service.logger.Error(
+				"Failed to decode unpair notification payload",
+				zap.Error(err),
+			)
+			return
+		}
+
+		h.service.HandleUnpair(unpairPacket.DeviceID)
 
 	default:
 		return

@@ -40,3 +40,14 @@ export async function rejectPairRequest(
         },
     );
 }
+
+export async function unpairDevice(
+    deviceID: string,
+) {
+    return apiClient.post(
+        "/api/pairings/unpair",
+        {
+            deviceId: deviceID,
+        },
+    );
+}

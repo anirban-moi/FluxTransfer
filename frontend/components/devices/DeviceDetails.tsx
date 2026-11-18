@@ -14,15 +14,20 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 import type { Device } from "@/features/devices/types/device";
 
 type DeviceDetailsProps = {
     device?: Device;
+    onPair?: (device: Device) => void;
+    onUnpair?: (device: Device) => void;
 };
 
 export function DeviceDetails({
     device,
+    onPair,
+    onUnpair,
 }: DeviceDetailsProps) {
     if (!device) {
         return (
@@ -40,8 +45,44 @@ export function DeviceDetails({
 
     return (
         <Card>
-            <CardHeader>
-                <CardTitle>{device.name}</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div>
+                    <CardTitle className="text-xl">{device.name}</CardTitle>
+                    <p className="text-sm text-muted-foreground">{device.hostname}</p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    {device.trust === "trusted" || device.pairingStatus === "paired" ? (
+                        <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => onUnpair?.(device)}
+                        >
+                            Unpair Device
+                        </Button>
+                    ) : device.trust === "pending" || device.pairingStatus === "pending" ? (
+                        <Button size="sm" variant="outline" disabled>
+                            Pairing in progress...
+                        </Button>
+                    ) : device.pairingStatus === "rejected" ? (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={device.status !== "online"}
+                            onClick={() => onPair?.(device)}
+                        >
+                            Retry Pairing
+                        </Button>
+                    ) : (
+                        <Button
+                            size="sm"
+                            disabled={device.status !== "online"}
+                            onClick={() => onPair?.(device)}
+                        >
+                            Pair Device
+                        </Button>
+                    )}
+                </div>
             </CardHeader>
 
             <CardContent className="space-y-6">

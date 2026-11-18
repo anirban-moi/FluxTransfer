@@ -2,6 +2,7 @@ package pairing
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"sync"
@@ -456,4 +457,75 @@ func (s *Service) GetDevicePairingState(deviceID string) (bool, string) {
 	}
 
 	return false, string(PairingStatusUnpaired)
+}
+
+func (s *Service) Unpair(deviceID string) error {
+	s.logger.Info(
+		"Unpairing device locally",
+		zap.String("targetDeviceID", deviceID),
+	)
+
+	// Remove from trusted repository
+	if err := s.trustedService.Remove(deviceID); err != nil {
+		s.logger.Error(
+			"Failed to remove device from trusted store",
+			zap.String("deviceID", deviceID),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	s.mu.Lock()
+	delete(s.outgoingStatus, deviceID)
+	s.mu.Unlock()
+
+	// Notify remote peer via UDP if registered with valid IP
+	if targetDevice, ok := s.deviceService.Get(deviceID); ok && targetDevice.IPAddress != "" {
+		payload, err := json.Marshal(map[string]string{
+			"deviceId": s.device.ID,
+		})
+		if err == nil {
+			envelope := &packetprotocol.Envelope{
+				Type:    packetprotocol.TypeUnpair,
+				Payload: payload,
+			}
+			data, err := packetprotocol.Encode(envelope)
+			if err == nil {
+				targetAddr := &net.UDPAddr{
+					IP:   net.ParseIP(targetDevice.IPAddress),
+					Port: 53317,
+				}
+				_ = s.sender.Send(data, targetAddr)
+				s.logger.Info(
+					"Unpair notification sent to peer",
+					zap.String("targetAddress", targetAddr.String()),
+				)
+			}
+		}
+	}
+
+	s.logger.Info(
+		"Device unpaired successfully",
+		zap.String("deviceID", deviceID),
+	)
+
+	return nil
+}
+
+func (s *Service) HandleUnpair(deviceID string) {
+	s.logger.Info(
+		"Remote unpair notification received",
+		zap.String("fromDeviceID", deviceID),
+	)
+
+	_ = s.trustedService.Remove(deviceID)
+
+	s.mu.Lock()
+	delete(s.outgoingStatus, deviceID)
+	s.mu.Unlock()
+
+	s.logger.Info(
+		"Peer removed from trusted devices",
+		zap.String("deviceID", deviceID),
+	)
 }

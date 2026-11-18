@@ -1,12 +1,18 @@
 export type DeviceStatus =
     | "online"
-    | "offline";
+    | "offline"
+    | "connecting";
 
 export interface Device {
     id: string;
     name: string;
     platform: string;
     status: DeviceStatus;
+    hostname?: string;
+    ipAddress?: string;
+    trust?: "trusted" | "untrusted" | "pending";
+    isTrusted?: boolean;
+    pairingStatus?: "unpaired" | "pending" | "paired" | "rejected";
 }
 
 export interface TransferItem {
@@ -15,6 +21,7 @@ export interface TransferItem {
     path: string;
     size: number;
     type: "file" | "directory";
+    file?: File;
 }
 
 export type TransferMode =
@@ -46,6 +53,7 @@ export interface TransferProgress {
     speed: number;
     remainingSeconds: number;
     currentFile?: string;
+    error?: string;
 }
 
 export interface SendTransferState {

@@ -12,7 +12,6 @@ import {
 import { IncomingPairDialog } from "@/components/pairing";
 
 import {
-    DevicesProvider,
     useDevices,
 } from "@/features/devices/context";
 
@@ -25,6 +24,7 @@ function DevicesWorkflow() {
         toggleOnlineOnly,
         refreshDevices,
         pairDevice,
+        unpairDevice,
         acceptRequest,
         rejectRequest,
     } = useDevices();
@@ -62,6 +62,7 @@ function DevicesWorkflow() {
                             }
                             onSelect={selectDevice}
                             onPair={pairDevice}
+                            onUnpair={unpairDevice}
                         />
                     )}
                 </div>
@@ -90,6 +91,8 @@ function DevicesWorkflow() {
             >
                 <DeviceDetails
                     device={state.selectedDevice}
+                    onPair={pairDevice}
+                    onUnpair={unpairDevice}
                 />
             </PageSection>
         </div>
@@ -97,9 +100,5 @@ function DevicesWorkflow() {
 }
 
 export default function DevicesPage() {
-    return (
-        <DevicesProvider>
-            <DevicesWorkflow />
-        </DevicesProvider>
-    );
+    return <DevicesWorkflow />;
 }

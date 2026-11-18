@@ -15,14 +15,6 @@ import { useReceiveTransfer } from "@/features/receive/context";
 export function SaveLocationSelector() {
     const { state, updateOptions } = useReceiveTransfer();
 
-    function handleBrowse() {
-        // TODO:
-        // Replace with native folder picker.
-        updateOptions({
-            saveLocation: "D:\\Downloads\\FluxTransfer",
-        });
-    }
-
     return (
         <Card>
             <CardHeader>
@@ -30,24 +22,32 @@ export function SaveLocationSelector() {
             </CardHeader>
 
             <CardContent className="space-y-4">
-                <div className="rounded-lg border p-4">
-                    <p className="text-sm text-muted-foreground">
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">
                         Destination Folder
-                    </p>
+                    </label>
 
-                    <p className="mt-2 font-medium">
-                        {state.options.saveLocation}
-                    </p>
-                </div>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={state.options.saveLocation}
+                            onChange={(e) => updateOptions({ saveLocation: e.target.value })}
+                            placeholder="./downloads"
+                            className="flex-1 rounded-lg border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-hidden"
+                        />
+                        <Button
+                            variant="outline"
+                            type="button"
+                            onClick={() => updateOptions({ saveLocation: "./downloads" })}
+                        >
+                            <FolderOpen className="mr-2 size-4" />
+                            Default
+                        </Button>
+                    </div>
 
-                <div className="flex justify-end">
-                    <Button
-                        variant="outline"
-                        onClick={handleBrowse}
-                    >
-                        <FolderOpen className="mr-2 size-4" />
-                        Browse
-                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                        Files will be securely saved into this folder on your machine.
+                    </p>
                 </div>
             </CardContent>
         </Card>

@@ -27,6 +27,10 @@ func (s *Server) registerRoutes(
 		s.pairing,
 	)
 
+	transferHandler := handlers.NewTransferHandler(
+		s.transfer,
+	)
+
 	mux.HandleFunc(
 		"GET /api/device",
 		deviceInfoHandler.Get,
@@ -53,8 +57,43 @@ func (s *Server) registerRoutes(
 	)
 
 	mux.HandleFunc(
+		"POST /api/pairings/unpair",
+		pairingsHandler.Unpair,
+	)
+
+	mux.HandleFunc(
 		"GET /api/pairings/pending",
 		pairingsHandler.Pending,
+	)
+
+	mux.HandleFunc(
+		"POST /api/transfers/send",
+		transferHandler.Send,
+	)
+
+	mux.HandleFunc(
+		"GET /api/transfers",
+		transferHandler.List,
+	)
+
+	mux.HandleFunc(
+		"GET /api/transfers/pending",
+		transferHandler.Pending,
+	)
+
+	mux.HandleFunc(
+		"POST /api/transfers/accept",
+		transferHandler.Accept,
+	)
+
+	mux.HandleFunc(
+		"POST /api/transfers/reject",
+		transferHandler.Reject,
+	)
+
+	mux.HandleFunc(
+		"POST /api/transfers/cancel",
+		transferHandler.Cancel,
 	)
 
 	mux.HandleFunc(

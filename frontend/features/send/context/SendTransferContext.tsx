@@ -3,6 +3,7 @@
 import {
     createContext,
     useContext,
+    useEffect,
     useRef,
     useMemo,
     useState,
@@ -16,6 +17,11 @@ import type {
     TransferOptions,
     TransferProgress,
 } from "../types/transfer";
+import {
+    sendFileTransfer,
+    getTransfers,
+    cancelTransfer as cancelTransferApi,
+} from "@/lib/api";
 
 type SendTransferContextType = {
     state: SendTransferState;
@@ -38,13 +44,13 @@ type SendTransferContextType = {
 
     resetTransfer: () => void;
 
-    startTransfer: () => void;
+    startTransfer: () => Promise<void>;
 
     pauseTransfer: () => void;
 
     resumeTransfer: () => void;
 
-    cancelTransfer: () => void;
+    cancelTransfer: () => Promise<void>;
 
     completeTransfer: () => void;
 };
@@ -82,6 +88,15 @@ export function SendTransferProvider({
 }) {
     const [state, setState] = useState<SendTransferState>(initialState);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const activeTransferIdRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+            }
+        };
+    }, []);
 
     function selectDevice(device: Device) {
         setState((prev) => ({
@@ -151,18 +166,29 @@ export function SendTransferProvider({
     }
 
     function resetTransfer() {
+        if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+        }
+        activeTransferIdRef.current = null;
         setState(initialState);
     }
 
-    function startTransfer() {
-        if (timerRef.current) {
-            clearInterval(timerRef.current);
+    async function startTransfer() {
+        if (!state.selectedDevice) {
+            return;
         }
 
-        const totalBytes = state.selectedItems.reduce(
-            (total, item) => total + item.size,
-            0
-        );
+        const firstItem = state.selectedItems[0];
+        if (!firstItem || !firstItem.file) {
+            console.error("No valid file selected for transfer");
+            return;
+        }
+
+        if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+        }
 
         setState((prev) => ({
             ...prev,
@@ -171,67 +197,108 @@ export function SendTransferProvider({
                 status: "running",
                 percentage: 0,
                 transferredBytes: 0,
-                totalBytes,
-                speed: 85 * 1024 * 1024,
-                remainingSeconds: 20,
-                currentFile: prev.selectedItems[0]?.name ?? "",
+                totalBytes: firstItem.size,
+                speed: 0,
+                remainingSeconds: 0,
+                currentFile: firstItem.name,
+                error: undefined,
             },
         }));
 
-        timerRef.current = setInterval(() => {
-            setState((prev) => {
-                if (prev.progress.status !== "running") {
-                    return prev;
-                }
+        try {
+            const resp = await sendFileTransfer(
+                state.selectedDevice.id,
+                firstItem.file
+            );
+            activeTransferIdRef.current = resp.transferId;
 
-                const nextPercentage = Math.min(
-                    prev.progress.percentage + 5,
-                    100
-                );
+            // Poll the backend transfer progress every 500ms
+            timerRef.current = setInterval(async () => {
+                try {
+                    const transfers = await getTransfers();
+                    const active = transfers.find(
+                        (t) => t.transferId === activeTransferIdRef.current
+                    );
 
-                if (nextPercentage >= 100) {
-                    if (timerRef.current) {
-                        clearInterval(timerRef.current);
-                        timerRef.current = null;
+                    if (!active) {
+                        return;
                     }
 
-                    return {
-                        ...prev,
-                        showSummary: true,
-                        progress: {
-                            ...prev.progress,
-                            status: "completed",
-                            percentage: 100,
-                            transferredBytes: prev.progress.totalBytes,
-                            remainingSeconds: 0,
-                            speed: 0,
-                        },
-                    };
+                    if (active.status === "completed") {
+                        if (timerRef.current) {
+                            clearInterval(timerRef.current);
+                            timerRef.current = null;
+                        }
+                        setState((prev) => ({
+                            ...prev,
+                            showSummary: true,
+                            progress: {
+                                ...prev.progress,
+                                status: "completed",
+                                percentage: 100,
+                                transferredBytes: active.fileSize,
+                                remainingSeconds: 0,
+                                speed: 0,
+                            },
+                        }));
+                    } else if (active.status === "failed") {
+                        if (timerRef.current) {
+                            clearInterval(timerRef.current);
+                            timerRef.current = null;
+                        }
+                        setState((prev) => ({
+                            ...prev,
+                            progress: {
+                                ...prev.progress,
+                                status: "failed",
+                                error: active.error || "Transfer failed",
+                            },
+                        }));
+                    } else if (active.status === "cancelled") {
+                        if (timerRef.current) {
+                            clearInterval(timerRef.current);
+                            timerRef.current = null;
+                        }
+                        setState((prev) => ({
+                            ...prev,
+                            progress: {
+                                ...prev.progress,
+                                status: "cancelled",
+                            },
+                        }));
+                    } else {
+                        // running, verifying, etc.
+                        setState((prev) => ({
+                            ...prev,
+                            progress: {
+                                ...prev.progress,
+                                status: "running",
+                                percentage: active.percentage,
+                                transferredBytes: active.transferredBytes,
+                                totalBytes: active.fileSize,
+                                speed: active.speed,
+                                remainingSeconds: active.remainingSeconds,
+                                currentFile: active.fileName,
+                            },
+                        }));
+                    }
+                } catch (pollErr) {
+                    console.error("Failed to poll transfers", pollErr);
                 }
-
-                return {
-                    ...prev,
-                    progress: {
-                        ...prev.progress,
-                        percentage: nextPercentage,
-                        transferredBytes:
-                            (prev.progress.totalBytes * nextPercentage) / 100,
-                        remainingSeconds: Math.max(
-                            0,
-                            prev.progress.remainingSeconds - 1
-                        ),
-                    },
-                };
-            });
-        }, 500);
+            }, 500);
+        } catch (err: any) {
+            setState((prev) => ({
+                ...prev,
+                progress: {
+                    ...prev.progress,
+                    status: "failed",
+                    error: err?.message || "Failed to initiate transfer",
+                },
+            }));
+        }
     }
 
     function pauseTransfer() {
-        if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-        }
-
         setState((prev) => ({
             ...prev,
             progress: {
@@ -249,59 +316,20 @@ export function SendTransferProvider({
                 status: "running",
             },
         }));
-
-        timerRef.current = setInterval(() => {
-            setState((prev) => {
-                if (prev.progress.status !== "running") {
-                    return prev;
-                }
-
-                const nextPercentage = Math.min(
-                    prev.progress.percentage + 5,
-                    100
-                );
-
-                if (nextPercentage >= 100) {
-                    if (timerRef.current) {
-                        clearInterval(timerRef.current);
-                        timerRef.current = null;
-                    }
-
-                    return {
-                        ...prev,
-                        showSummary: true,
-                        progress: {
-                            ...prev.progress,
-                            status: "completed",
-                            percentage: 100,
-                            transferredBytes: prev.progress.totalBytes,
-                            remainingSeconds: 0,
-                            speed: 0,
-                        },
-                    };
-                }
-
-                return {
-                    ...prev,
-                    progress: {
-                        ...prev.progress,
-                        percentage: nextPercentage,
-                        transferredBytes:
-                            (prev.progress.totalBytes * nextPercentage) / 100,
-                        remainingSeconds: Math.max(
-                            0,
-                            prev.progress.remainingSeconds - 1
-                        ),
-                    },
-                };
-            });
-        }, 500);
     }
 
-    function cancelTransfer() {
+    async function cancelTransfer() {
         if (timerRef.current) {
             clearInterval(timerRef.current);
             timerRef.current = null;
+        }
+
+        if (activeTransferIdRef.current) {
+            try {
+                await cancelTransferApi(activeTransferIdRef.current);
+            } catch (err) {
+                console.error("Failed to cancel transfer", err);
+            }
         }
 
         setState((prev) => ({
@@ -317,7 +345,6 @@ export function SendTransferProvider({
         setState((prev) => ({
             ...prev,
             showSummary: true,
-
             progress: {
                 ...prev.progress,
                 status: "completed",
@@ -329,21 +356,22 @@ export function SendTransferProvider({
         }));
     }
 
-    const value = useMemo(() => ({
-        state,
-        selectDevice,
-        addItems,
-        removeItem,
-        clearItems,
-        updateOptions,
-        updateProgress,
-        startTransfer,
-        pauseTransfer,
-        resumeTransfer,
-        cancelTransfer,
-        completeTransfer,
-        resetTransfer,
-    }),
+    const value = useMemo(
+        () => ({
+            state,
+            selectDevice,
+            addItems,
+            removeItem,
+            clearItems,
+            updateOptions,
+            updateProgress,
+            startTransfer,
+            pauseTransfer,
+            resumeTransfer,
+            cancelTransfer,
+            completeTransfer,
+            resetTransfer,
+        }),
         [state]
     );
 

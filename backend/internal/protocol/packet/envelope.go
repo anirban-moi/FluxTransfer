@@ -9,6 +9,9 @@ const (
 	TypeHeartbeat    Type = "heartbeat"
 	TypePairRequest  Type = "pair-request"
 	TypePairResponse Type = "pair-response"
+	TypeUnpair           Type = "unpair"
+	TypeTransferRequest  Type = "transfer-request"
+	TypeTransferResponse Type = "transfer-response"
 )
 
 type Envelope struct {

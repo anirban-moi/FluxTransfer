@@ -7,18 +7,22 @@ export function validateTransfer(
 
     if (!state.selectedDevice) {
         errors.push("Please select a destination device.");
-    }
+    } else {
+        if (state.selectedDevice.status === "offline") {
+            errors.push("The selected device is offline.");
+        }
 
-    if (state.selectedDevice?.status === "offline") {
-        errors.push("The selected device is offline.");
+        const isPaired =
+            state.selectedDevice.pairingStatus === "paired" ||
+            Boolean(state.selectedDevice.isTrusted);
+
+        if (!isPaired) {
+            errors.push("The selected device is not paired. Please pair devices before transferring.");
+        }
     }
 
     if (state.selectedItems.length === 0) {
-        errors.push("Please select at least one file or folder.");
-    }
-
-    if (!state.options.destinationPath.trim()) {
-        errors.push("Destination folder is required.");
+        errors.push("Please select at least one file to transfer.");
     }
 
     return errors;

@@ -3,6 +3,7 @@
 import {
     createContext,
     useContext,
+    useEffect,
     useMemo,
     useRef,
     useState,
@@ -15,13 +16,20 @@ import type {
     ReceiveProgress,
     ReceiveTransferState,
 } from "../types/transfer";
+import {
+    getPendingTransfers,
+    getTransfers,
+    acceptTransfer as acceptTransferApi,
+    rejectTransfer as rejectTransferApi,
+    cancelTransfer as cancelTransferApi,
+} from "@/lib/api";
 
 type ReceiveTransferContextType = {
     state: ReceiveTransferState;
 
     acceptTransfer: (transfer: IncomingTransfer) => void;
 
-    rejectTransfer: () => void;
+    rejectTransfer: () => Promise<void>;
 
     updateOptions: (
         options: Partial<ReceiveOptions>
@@ -31,13 +39,13 @@ type ReceiveTransferContextType = {
         progress: Partial<ReceiveProgress>
     ) => void;
 
-    startReceive: () => void;
+    startReceive: () => Promise<void>;
 
     pauseReceive: () => void;
 
     resumeReceive: () => void;
 
-    cancelReceive: () => void;
+    cancelReceive: () => Promise<void>;
 
     completeReceive: () => void;
 
@@ -45,7 +53,7 @@ type ReceiveTransferContextType = {
 };
 
 const defaultOptions: ReceiveOptions = {
-    saveLocation: "D:\\Downloads\\FluxTransfer",
+    saveLocation: "./downloads",
     conflictResolution: "ask",
     verifyIntegrity: false,
     preserveTimestamps: true,
@@ -79,36 +87,110 @@ export function ReceiveTransferProvider({
     const [state, setState] =
         useState<ReceiveTransferState>(initialState);
 
-    const timerRef = useRef<NodeJS.Timeout | null>(
-        null
-    );
+    const activeTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const activeTransferIdRef = useRef<string | null>(null);
 
-    function acceptTransfer(
-        transfer: IncomingTransfer
-    ) {
+    // Poll for pending transfer requests every 1.5s when waiting
+    useEffect(() => {
+        let isMounted = true;
+
+        const pollPending = async () => {
+            if (state.progress.status !== "waiting" && state.progress.status !== "pending") {
+                return;
+            }
+
+            try {
+                const pendingList = await getPendingTransfers();
+                if (!isMounted) return;
+
+                if (pendingList && pendingList.length > 0) {
+                    const req = pendingList[0];
+                    activeTransferIdRef.current = req.transferId;
+                    setState((prev) => ({
+                        ...prev,
+                        incomingTransfer: {
+                            id: req.transferId,
+                            senderName: req.senderName,
+                            senderPlatform: "FluxTransfer Peer",
+                            transferName: req.fileName,
+                            totalFiles: req.totalFiles || 1,
+                            totalSize: req.fileSize,
+                            senderId: req.senderId,
+                            checksum: req.checksum,
+                        },
+                        progress: {
+                            ...prev.progress,
+                            totalBytes: req.fileSize,
+                            currentFile: req.fileName,
+                        },
+                    }));
+                } else if (state.progress.status === "waiting" && state.incomingTransfer) {
+                    setState((prev) => ({
+                        ...prev,
+                        incomingTransfer: undefined,
+                    }));
+                }
+            } catch (err) {
+                console.error("Failed to check pending transfers", err);
+            }
+        };
+
+        pollPending();
+        const interval = setInterval(pollPending, 1500);
+
+        return () => {
+            isMounted = false;
+            clearInterval(interval);
+        };
+    }, [state.progress.status, state.incomingTransfer]);
+
+    // Cleanup active transfer timer
+    useEffect(() => {
+        return () => {
+            if (activeTimerRef.current) {
+                clearInterval(activeTimerRef.current);
+            }
+        };
+    }, []);
+
+    function acceptTransfer(transfer: IncomingTransfer) {
+        activeTransferIdRef.current = transfer.id;
         setState((prev) => ({
             ...prev,
             incomingTransfer: transfer,
             progress: {
                 ...prev.progress,
                 status: "pending",
+                totalBytes: transfer.totalSize,
+                currentFile: transfer.transferName,
             },
         }));
     }
 
-    function rejectTransfer() {
+    async function rejectTransfer() {
+        const transferId = state.incomingTransfer?.id || activeTransferIdRef.current;
+        if (transferId) {
+            try {
+                await rejectTransferApi(transferId, "Rejected by user");
+            } catch (err) {
+                console.error("Failed to reject transfer", err);
+            }
+        }
+
+        activeTransferIdRef.current = null;
         setState((prev) => ({
             ...prev,
+            incomingTransfer: undefined,
             progress: {
                 ...prev.progress,
-                status: "rejected",
+                status: "waiting",
+                percentage: 0,
+                receivedBytes: 0,
             },
         }));
     }
 
-    function updateOptions(
-        options: Partial<ReceiveOptions>
-    ) {
+    function updateOptions(options: Partial<ReceiveOptions>) {
         setState((prev) => ({
             ...prev,
             options: {
@@ -118,9 +200,7 @@ export function ReceiveTransferProvider({
         }));
     }
 
-    function updateProgress(
-        progress: Partial<ReceiveProgress>
-    ) {
+    function updateProgress(progress: Partial<ReceiveProgress>) {
         setState((prev) => ({
             ...prev,
             progress: {
@@ -130,87 +210,118 @@ export function ReceiveTransferProvider({
         }));
     }
 
-    function startReceiveTimer() {
-        if (timerRef.current) {
-            clearInterval(timerRef.current);
+    async function startReceive() {
+        const transferId = state.incomingTransfer?.id || activeTransferIdRef.current;
+        if (!transferId) {
+            return;
         }
 
-        timerRef.current = setInterval(() => {
-            setState((prev) => {
-                if (prev.progress.status !== "receiving") {
-                    return prev;
-                }
-
-                const nextPercentage = Math.min(
-                    prev.progress.percentage + 5,
-                    100
-                );
-
-                if (nextPercentage >= 100) {
-                    if (timerRef.current) {
-                        clearInterval(timerRef.current);
-                        timerRef.current = null;
-                    }
-
-                    return {
-                        ...prev,
-                        showSummary: true,
-                        progress: {
-                            ...prev.progress,
-                            status: "completed",
-                            percentage: 100,
-                            receivedBytes: prev.progress.totalBytes,
-                            remainingSeconds: 0,
-                            speed: 0,
-                        },
-                    };
-                }
-
-                return {
-                    ...prev,
-                    progress: {
-                        ...prev.progress,
-                        percentage: nextPercentage,
-                        receivedBytes:
-                            (prev.progress.totalBytes * nextPercentage) / 100,
-                        remainingSeconds: Math.max(
-                            0,
-                            prev.progress.remainingSeconds - 1
-                        ),
-                    },
-                };
-            });
-        }, 500);
-    }
-
-    function startReceive() {
-        if (!state.incomingTransfer) {
-            return;
+        if (activeTimerRef.current) {
+            clearInterval(activeTimerRef.current);
+            activeTimerRef.current = null;
         }
 
         setState((prev) => ({
             ...prev,
             showSummary: false,
             progress: {
+                ...prev.progress,
                 status: "receiving",
                 percentage: 0,
                 receivedBytes: 0,
-                totalBytes: prev.incomingTransfer?.totalSize ?? 0,
-                speed: 82 * 1024 * 1024,
-                remainingSeconds: 20,
-                currentFile: "Preparing...",
+                speed: 0,
+                remainingSeconds: 0,
+                error: undefined,
             },
         }));
 
-        startReceiveTimer();
+        try {
+            await acceptTransferApi(transferId, state.options.saveLocation);
+
+            // Start polling active transfer progress
+            activeTimerRef.current = setInterval(async () => {
+                try {
+                    const transfers = await getTransfers();
+                    const active = transfers.find((t) => t.transferId === transferId);
+
+                    if (!active) {
+                        return;
+                    }
+
+                    if (active.status === "completed") {
+                        if (activeTimerRef.current) {
+                            clearInterval(activeTimerRef.current);
+                            activeTimerRef.current = null;
+                        }
+                        setState((prev) => ({
+                            ...prev,
+                            showSummary: true,
+                            progress: {
+                                ...prev.progress,
+                                status: "completed",
+                                percentage: 100,
+                                receivedBytes: active.fileSize,
+                                remainingSeconds: 0,
+                                speed: 0,
+                            },
+                        }));
+                    } else if (active.status === "failed") {
+                        if (activeTimerRef.current) {
+                            clearInterval(activeTimerRef.current);
+                            activeTimerRef.current = null;
+                        }
+                        setState((prev) => ({
+                            ...prev,
+                            progress: {
+                                ...prev.progress,
+                                status: "failed",
+                                error: active.error || "Receive transfer failed",
+                            },
+                        }));
+                    } else if (active.status === "cancelled") {
+                        if (activeTimerRef.current) {
+                            clearInterval(activeTimerRef.current);
+                            activeTimerRef.current = null;
+                        }
+                        setState((prev) => ({
+                            ...prev,
+                            progress: {
+                                ...prev.progress,
+                                status: "cancelled",
+                            },
+                        }));
+                    } else {
+                        setState((prev) => ({
+                            ...prev,
+                            progress: {
+                                ...prev.progress,
+                                status: "receiving",
+                                percentage: active.percentage,
+                                receivedBytes: active.transferredBytes,
+                                totalBytes: active.fileSize,
+                                speed: active.speed,
+                                remainingSeconds: active.remainingSeconds,
+                                currentFile: active.fileName,
+                            },
+                        }));
+                    }
+                } catch (pollErr) {
+                    console.error("Failed to poll receive progress", pollErr);
+                }
+            }, 500);
+        } catch (err: any) {
+            setState((prev) => ({
+                ...prev,
+                progress: {
+                    ...prev.progress,
+                    status: "failed",
+                    error: err?.message || "Failed to accept transfer",
+                },
+            }));
+        }
     }
 
     function pauseReceive() {
-        if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-        }
-
         setState((prev) => ({
             ...prev,
             progress: {
@@ -228,14 +339,21 @@ export function ReceiveTransferProvider({
                 status: "receiving",
             },
         }));
-
-        startReceiveTimer();
     }
 
-    function cancelReceive() {
-        if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
+    async function cancelReceive() {
+        if (activeTimerRef.current) {
+            clearInterval(activeTimerRef.current);
+            activeTimerRef.current = null;
+        }
+
+        const transferId = state.incomingTransfer?.id || activeTransferIdRef.current;
+        if (transferId) {
+            try {
+                await cancelTransferApi(transferId);
+            } catch (err) {
+                console.error("Failed to cancel receive transfer", err);
+            }
         }
 
         setState((prev) => ({
@@ -248,9 +366,9 @@ export function ReceiveTransferProvider({
     }
 
     function completeReceive() {
-        if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
+        if (activeTimerRef.current) {
+            clearInterval(activeTimerRef.current);
+            activeTimerRef.current = null;
         }
 
         setState((prev) => ({
@@ -260,8 +378,7 @@ export function ReceiveTransferProvider({
                 ...prev.progress,
                 status: "completed",
                 percentage: 100,
-                receivedBytes:
-                    prev.progress.totalBytes,
+                receivedBytes: prev.progress.totalBytes,
                 remainingSeconds: 0,
                 speed: 0,
             },
@@ -269,11 +386,11 @@ export function ReceiveTransferProvider({
     }
 
     function resetReceive() {
-        if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
+        if (activeTimerRef.current) {
+            clearInterval(activeTimerRef.current);
+            activeTimerRef.current = null;
         }
-
+        activeTransferIdRef.current = null;
         setState(initialState);
     }
 

@@ -123,7 +123,7 @@ export function ReceiveReview() {
                     )}
                     <Button
                         disabled={!canReceive}
-                        onClick={startReceive}
+                        onClick={() => startReceive()}
                     >
                         Start Receiving
                         <ArrowRight className="ml-2 size-4" />

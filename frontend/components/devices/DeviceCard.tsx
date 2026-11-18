@@ -23,6 +23,8 @@ type DeviceCardProps = {
     onClick?: (device: Device) => void;
 
     onPair?: (device: Device) => void;
+
+    onUnpair?: (device: Device) => void;
 };
 
 function getPlatformIcon(platform: Device["platform"]) {
@@ -66,6 +68,7 @@ export function DeviceCard({
     device,
     onClick,
     onPair,
+    onUnpair,
 }: DeviceCardProps) {
     return (
         <Card
@@ -108,9 +111,22 @@ export function DeviceCard({
                     </div>
                     <div className="mt-3 flex items-center gap-2">
                         {device.trust === "trusted" || device.pairingStatus === "paired" ? (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-green-500/10 px-2 py-1 text-xs font-medium text-green-600 dark:text-green-400">
-                                <CheckCircle2 className="size-3.5" /> Paired
-                            </span>
+                            <>
+                                <span className="inline-flex items-center gap-1 rounded-md bg-green-500/10 px-2 py-1 text-xs font-medium text-green-600 dark:text-green-400">
+                                    <CheckCircle2 className="size-3.5" /> Paired
+                                </span>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onUnpair?.(device);
+                                    }}
+                                >
+                                    Unpair
+                                </Button>
+                            </>
                         ) : device.trust === "pending" || device.pairingStatus === "pending" ? (
                             <Button
                                 size="sm"
@@ -120,6 +136,24 @@ export function DeviceCard({
                             >
                                 <LoaderCircle className="size-3 animate-spin mr-1.5" /> Pairing...
                             </Button>
+                        ) : device.pairingStatus === "rejected" ? (
+                            <>
+                                <span className="inline-flex items-center gap-1 rounded-md bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive">
+                                    Rejected
+                                </span>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2 text-xs"
+                                    disabled={device.status !== "online"}
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onPair?.(device);
+                                    }}
+                                >
+                                    Retry
+                                </Button>
+                            </>
                         ) : (
                             <Button
                                 size="sm"

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+    AlertCircle,
     Clock3,
     Pause,
     Play,
@@ -35,6 +36,15 @@ export function ReceiveProgress() {
             </CardHeader>
 
             <CardContent className="space-y-6">
+                {progress.status === "failed" && progress.error && (
+                    <div className="flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+                        <AlertCircle className="size-5 shrink-0" />
+                        <div>
+                            <p className="font-semibold">Receive Failed</p>
+                            <p className="text-xs opacity-90">{progress.error}</p>
+                        </div>
+                    </div>
+                )}
                 {/* Status */}
                 <div className="flex items-center justify-between">
                     <span className="font-medium">

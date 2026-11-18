@@ -19,8 +19,7 @@ import { validateTransfer } from "@/features/send/utils/validateTransfer";
 import { formatBytes } from "@/features/send/utils/formatBytes";
 
 export function TransferReview() {
-    const { state } = useSendTransfer();
-    const { startTransfer } = useSendTransfer();
+    const { state, startTransfer } = useSendTransfer();
     const totalItems = state.selectedItems.length;
 
     const totalSize = state.selectedItems.reduce(
@@ -104,7 +103,7 @@ export function TransferReview() {
                             </ul>
                         </div>
                     )}
-                    <Button disabled={!canTransfer} onClick={startTransfer}>
+                    <Button disabled={!canTransfer} onClick={() => startTransfer()}>
                         Start Transfer
                     </Button>
                 </div>

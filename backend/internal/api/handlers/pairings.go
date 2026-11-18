@@ -96,3 +96,31 @@ func (h *PairingsHandler) Reject(
 
 	w.WriteHeader(http.StatusOK)
 }
+
+func (h *PairingsHandler) Unpair(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+
+	var request PairActionRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	if err := h.service.Unpair(request.DeviceID); err != nil {
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}

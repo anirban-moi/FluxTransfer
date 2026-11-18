@@ -11,7 +11,7 @@ import {
 
 // import { mockDevices } from "../constants/devices";
 import {
-    getDevices, getPendingPairRequests, pairDevice as pairDeviceApi, PendingPairRequest, acceptPairRequest,
+    getDevices, getPendingPairRequests, pairDevice as pairDeviceApi, unpairDevice as unpairDeviceApi, PendingPairRequest, acceptPairRequest,
     rejectPairRequest,
 } from "@/lib/api";
 import type { Device } from "../types/device";
@@ -34,6 +34,7 @@ type DevicesContextType = {
     refreshDevices: () => Promise<void>;
     discoverDevices: () => void;
     pairDevice: (device: Device) => Promise<void>;
+    unpairDevice: (device: Device) => Promise<void>;
     acceptRequest: (deviceID: string) => void;
     rejectRequest: (deviceID: string) => void;
     // pendingPairRequests: PendingPairRequest[];
@@ -206,6 +207,41 @@ export function DevicesProvider({
         }
     }
 
+    async function unpairDevice(
+        device: Device,
+    ) {
+        setState((prev) => ({
+            ...prev,
+            devices: prev.devices.map((d) =>
+                d.id === device.id
+                    ? { ...d, trust: "untrusted", pairingStatus: "unpaired" }
+                    : d
+            ),
+            selectedDevice:
+                prev.selectedDevice?.id === device.id
+                    ? { ...prev.selectedDevice, trust: "untrusted", pairingStatus: "unpaired" }
+                    : prev.selectedDevice,
+        }));
+
+        try {
+            await unpairDeviceApi(
+                device.id,
+            );
+
+            console.log(
+                "Device unpaired:",
+                device.name,
+            );
+        } catch (error) {
+            console.error(
+                "Failed to unpair device",
+                error,
+            );
+        } finally {
+            fetchDevices();
+        }
+    }
+
     const visibleDevices = useMemo(() => {
         return state.devices.filter((device) => {
             const matchesSearch =
@@ -241,6 +277,7 @@ export function DevicesProvider({
             refreshDevices,
             discoverDevices,
             pairDevice,
+            unpairDevice,
             acceptRequest,
             rejectRequest,
         }),
